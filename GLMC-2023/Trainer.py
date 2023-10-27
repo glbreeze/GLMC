@@ -47,7 +47,7 @@ class Trainer(object):
     def train(self):
         best_acc1 = 0
         for epoch in range(self.start_epoch, self.epochs):
-            alpha = 1 - (epoch / self.epochs) ** 2
+            alpha = 1 - (epoch / self.epochs) ** 2     # balance loss terms
             batch_time = AverageMeter('Time', ':6.3f')
             data_time = AverageMeter('Data', ':6.3f')
             losses = AverageMeter('Loss', ':.4e')

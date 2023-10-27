@@ -71,7 +71,7 @@ class Cifar100Imbanlance(Dataset):
             data_percent.append(int(num))
 
         self.per_class_num = data_percent
-        print("imbanlance ration is {}".format(data_percent[0] / data_percent[-1]))
+        print("imbanlance ratio is {}".format(data_percent[0] / data_percent[-1]))
         print("per class num：{}".format(data_percent))
 
         for i in range(1, self.num_cls + 1):

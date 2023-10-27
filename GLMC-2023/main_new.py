@@ -89,7 +89,6 @@ def main_worker(gpu, args):
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
     # create model
-    num_classes = args.num_classes
     model = get_model(args)
     _ = print_model_param_nums(model=model)
     if args.gpu is not None:
@@ -134,8 +133,6 @@ def main_worker(gpu, args):
     for label in train_dataset.targets:
         cls_num_list[label] += 1
     train_cls_num_list = np.array(cls_num_list)
-    train_sampler = None
-    weighted_train_loader = None
 
     #weighted_loader
     cls_weight = 1.0 / (np.array(cls_num_list) ** args.resample_weighting)
@@ -162,7 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')
-    parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
+
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate',dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
@@ -171,6 +168,8 @@ if __name__ == '__main__':
     parser.add_argument('--resample_weighting', default=0.2, type=float,help='weighted for sampling probability (q(1,k))')
     parser.add_argument('--label_weighting', default=1.0, type=float, help='weighted for Loss')
     parser.add_argument('--contrast_weight', default=10,type=int,help='Mixture Consistency  Weights')
+    parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
+
     # etc.
     parser.add_argument('--seed', default=3407, type=int, help='seed for initializing training. ')
     parser.add_argument('-p', '--print_freq', default=1000, type=int, metavar='N',help='print frequency (default: 100)')
