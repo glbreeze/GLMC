@@ -1,3 +1,4 @@
+import pdb
 import sys
 import os
 import time
@@ -158,8 +159,8 @@ if __name__ == '__main__':
     # train set
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
-    parser.add_argument('--root', type=str, default='/data/', help="dataset setting")
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',help='number of data loading workers (default: 4)')
     parser.add_argument('--resume', default=None, type=str, metavar='PATH',help='path to latest checkpoint (default: none)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',help='manual epoch number (useful on restarts)')
-    parser.add_argument('--root_log', type=str, default='GLMC-CVPR2023/output/')
-    parser.add_argument('--root_model', type=str, default='GLMC-CVPR2023/output/')
-    parser.add_argument('--store_name', type=str, default='GLMC-CVPR2023/output/')
+    parser.add_argument('--root_log', type=str, default='./output/log/')
+    parser.add_argument('--root_model', type=str, default='./output/log/')
+    parser.add_argument('--store_name', type=str, default='cifar')
     main()
