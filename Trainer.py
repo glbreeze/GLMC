@@ -36,11 +36,12 @@ class Trainer(object):
         self.log = log
         self.beta = args.beta
         self.update_weight()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def update_weight(self):
         per_cls_weights = 1.0 / (np.array(self.cls_num_list) ** self.label_weighting)
         per_cls_weights = per_cls_weights / np.sum(per_cls_weights) * len(self.cls_num_list)
-        self.per_cls_weights = torch.FloatTensor(per_cls_weights).cuda()
+        self.per_cls_weights = torch.FloatTensor(per_cls_weights).to(self.device)
 
     def train(self):
         best_acc1 = 0
@@ -164,8 +165,8 @@ class Trainer(object):
 
             for i, (inputs, targets) in enumerate(self.train_loader):
 
-                inputs = inputs.cuda()
-                targets = targets.cuda()
+                inputs = inputs.to(self.device)
+                targets = targets.to(self.device)
 
                 output, output_cb, z, p = self.model(inputs, train=True)
 
@@ -190,14 +191,15 @@ class Trainer(object):
                 epoch=epoch + 1, batch_time=batch_time, loss=losses))
 
             # measure NC
-            if self.args.debug:
-                nc_dict = analysis(self.model, self.train_loader, self.args)
-                self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
-                    nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
-                    np.array2string(nc_dict['w_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                    np.array2string(nc_dict['h_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                    np.array2string(nc_dict['w_cos'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
-                ))
+            if self.args.debug>0:
+                if epoch % self.args.debug == 0:
+                    nc_dict = analysis(self.model, self.train_loader, self.args)
+                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
+                        nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
+                        np.array2string(nc_dict['w_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['h_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['w_cos'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
+                    ))
 
             # evaluate on validation set
             acc1 = self.validate(epoch=epoch)
@@ -230,8 +232,8 @@ class Trainer(object):
         with torch.no_grad():
             end = time.time()
             for i, (input, target) in enumerate(self.val_loader):
-                input = input.cuda()
-                target = target.cuda()
+                input = input.to(self.device)
+                target = target.to(self.device)
 
                 # compute output
                 output = self.model(input, train=False)
@@ -276,7 +278,7 @@ class Trainer(object):
         few_shot = self.cls_num_list <= 20
 
         many_acc = float(sum(cls_acc[many_shot]) * 100 / (sum(many_shot) + eps))
-        medium_acc = float(sum(cls_acc[medium_shot]) * 100 / (sum(medium_shot) + eps)),
+        medium_acc = float(sum(cls_acc[medium_shot]) * 100 / (sum(medium_shot) + eps))
         few_acc = float(sum(cls_acc[few_shot]) * 100 / (sum(few_shot) + eps))
 
         return cls_acc, many_acc, medium_acc, few_acc
