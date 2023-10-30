@@ -166,6 +166,7 @@ if __name__ == '__main__':
     parser.add_argument('--root_model', type=str, default='./output/')
     parser.add_argument('--store_name', type=str, default='name')
     parser.add_argument('--debug',  type=int, default=10)
+    parser.add_argument('--knn', default=False, action='store_true')
     args = parser.parse_args()
 
     if args.dataset == 'cifar10':

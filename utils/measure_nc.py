@@ -62,7 +62,7 @@ def analysis(model, loader, args):
     Sb = torch.matmul(M_, M_.T) / args.num_classes
 
     # avg norm
-    W = model.classifier.weight       # [C, 512]
+    W = model.fc_cb.weight.detach()       # [C, 512]
     M_norms = torch.norm(M_, dim=0)   # [C]
     W_norms = torch.norm(W.T, dim=0)  # [C]
     #h_norm_cov = (torch.std(M_norms) / torch.mean(M_norms)).item()

@@ -6,12 +6,12 @@ import datetime
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.backends import cudnn
 from sklearn.metrics import confusion_matrix
 
 from utils import util
 from utils.util import *
 from utils.measure_nc import analysis
+from model.KNN_classifier import KNNClassifier
 
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
@@ -170,8 +170,8 @@ class Trainer(object):
 
                 output, output_cb, z, p = self.model(inputs, ret='all')
 
-                criterion = nn.CrossEntropyLoss(reduction='mean')
-                loss = criterion(output, targets)
+                criterion = nn.CrossEntropyLoss(reduction='mean')               # train fc_bc
+                loss = criterion(output_cb, targets)
                 losses.update(loss.item(), inputs[0].size(0))
 
                 # compute gradient and do SGD step
@@ -202,11 +202,15 @@ class Trainer(object):
                     ))
 
             # evaluate on validation set
-            acc1 = self.validate(epoch=epoch)
+            if self.args.knn:
+                acc = self.validate_knn(epoch=epoch)
+            else:
+                acc1 = self.validate(epoch=epoch)
             if self.args.dataset == 'ImageNet-LT' or self.args.dataset == 'iNaturelist2018':
                 self.paco_adjust_learning_rate(self.optimizer, epoch, self.args)
             else:
                 self.train_scheduler.step()
+            self.model.train()
 
             # remember best acc@1 and save checkpoint
             is_best = acc1 > best_acc1
@@ -236,7 +240,7 @@ class Trainer(object):
                 target = target.to(self.device)
 
                 # compute output
-                output = self.model(input, ret='o')
+                output = self.model(input, ret='o')      # pred from fc_bc
 
                 # measure accuracy
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -248,6 +252,54 @@ class Trainer(object):
                 end = time.time()
 
                 _, pred = torch.max(output, 1)
+                all_preds.extend(pred.cpu().numpy())
+                all_targets.extend(target.cpu().numpy())
+
+                if i % self.print_freq == 0:
+                    output = ('Test: [{0}/{1}], '
+                              'Time {batch_time.val:.3f} ({batch_time.avg:.3f}), '
+                              'Prec@1 {top1.val:.3f} ({top1.avg:.3f}), '
+                              'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                        i, len(self.val_loader), batch_time=batch_time, top1=top1, top5=top5))
+                    print(output)
+
+            cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
+            self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
+            self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
+            out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
+
+        return top1.avg
+
+    def validate_knn(self,epoch=None):
+        batch_time = AverageMeter('Time', ':6.3f')
+        top1 = AverageMeter('Acc@1', ':6.2f')
+        top5 = AverageMeter('Acc@5', ':6.2f')
+
+        # switch to evaluate mode
+        self.model.eval()
+        all_preds = []
+        all_targets = []
+        cfeats = self.get_knncentroids()
+        self.knn_classifier = KNNClassifier(feat_dim=self.model.out_dim, num_classes=self.args.num_classes, feat_type='cl2n', dist_type='l2')
+        self.classifier.update(cfeats)
+
+        with torch.no_grad():
+            end = time.time()
+            for i, (input, target) in enumerate(self.val_loader):
+                input, target = input.to(self.device), target.to(self.device)
+                _, feats = self.model(input, ret='of')      # pred from fc_bc
+                logit = self.knn_classifier(feats)
+
+                # measure accuracy
+                acc1, acc5 = accuracy(logit, target, topk=(1, 5))
+                top1.update(acc1.item(), input.size(0))
+                top5.update(acc5.item(), input.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+                _, pred = torch.max(logit, 1)
                 all_preds.extend(pred.cpu().numpy())
                 all_targets.extend(target.cpu().numpy())
 
@@ -305,6 +357,54 @@ class Trainer(object):
             lr *= 0.5 * (1. + math.cos(math.pi * (epoch - warmup_epochs + 1) / (self.epochs - warmup_epochs + 1)))
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
+
+    def get_knncentroids(self):
+        print('===> Calculating KNN centroids.')
+
+        torch.cuda.empty_cache()
+        self.model.eval()
+        feats_all, labels_all = [], []
+
+        # Calculate initial centroids only on training data.
+        with torch.set_grad_enabled(False):
+            for i, (inputs, labels) in enumerate(self.train_loader):
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+                # Calculate Features of each training data
+                _, feats = self.model(inputs, ret='of')
+                feats_all.append(feats.cpu().numpy())
+                labels_all.append(labels.cpu().numpy())
+
+        feats = np.concatenate(feats_all)
+        labels = np.concatenate(labels_all)
+        featmean = feats.mean(axis=0)
+
+        def get_centroids(feats_, labels_):
+            centroids = []
+            for i in np.unique(labels_):
+                centroids.append(np.mean(feats_[labels_ == i], axis=0))
+            return np.stack(centroids)
+
+        # Get unnormalized centorids
+        un_centers = get_centroids(feats, labels)
+
+        # Get l2n centorids
+        l2n_feats = torch.Tensor(feats.copy())
+        norm_l2n = torch.norm(l2n_feats, 2, 1, keepdim=True)
+        l2n_feats = l2n_feats / norm_l2n
+        l2n_centers = get_centroids(l2n_feats.numpy(), labels)
+
+        # Get cl2n centorids
+        cl2n_feats = torch.Tensor(feats.copy())
+        cl2n_feats = cl2n_feats - torch.Tensor(featmean)
+        norm_cl2n = torch.norm(cl2n_feats, 2, 1, keepdim=True)
+        cl2n_feats = cl2n_feats / norm_cl2n
+        cl2n_centers = get_centroids(cl2n_feats.numpy(), labels)
+
+        return {'mean': featmean,
+                'uncs': un_centers,
+                'l2ncs': l2n_centers,
+                'cl2ncs': cl2n_centers}
 
 
 
