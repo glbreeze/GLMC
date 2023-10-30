@@ -42,9 +42,6 @@ class Cifar10Imbanlance(Dataset):
         y_train = train_data.targets
         y_train = np.array(y_train)
 
-        rehearsal_data = None
-        rehearsal_label = None
-
         data_percent = []
         data_num = int(x_train.shape[0] / self.num_cls)
 
@@ -55,20 +52,19 @@ class Cifar10Imbanlance(Dataset):
             else:
                 num = data_num
                 data_percent.append(int(num))
+        self.class_list = data_percent
         if train:
             print("imbanlance_ration is {}".format(data_percent[0] / data_percent[-1]))
             print("per class num: {}".format(data_percent))
 
-        self.class_list = data_percent
 
-
-
+        rehearsal_data = None
+        rehearsal_label = None
         for i in range(1, self.num_cls + 1):
-            a1 = y_train >= i - 1
-            a2 = y_train < i
-            index = a1 & a2
+            index = (y_train >= i - 1) & (y_train < i)
             task_train_x = x_train[index]
             label = y_train[index]
+
             data_num = task_train_x.shape[0]
             index = np.random.choice(data_num, data_percent[i - 1],replace=False)
             tem_data = task_train_x[index]

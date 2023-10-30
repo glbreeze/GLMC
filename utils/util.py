@@ -162,8 +162,7 @@ def get_transform(dataset):
         return transform_train, transform_val
 
 def prepare_folders(args):
-    folders_util = [args.root_log, args.root_model,
-                    os.path.join(args.root_log, args.store_name),
+    folders_util = [os.path.join(args.root_log, args.store_name),
                     os.path.join(args.root_model, args.store_name)]
     for folder in folders_util:
         if not os.path.exists(folder):

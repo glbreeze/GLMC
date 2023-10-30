@@ -67,8 +67,8 @@ def main():
     args = parser.parse_args()
     print(args)
     curr_time = datetime.datetime.now()
-    args.store_name = '#'.join(["dataset: " + args.dataset, "arch: " + args.arch,"imbanlance_rate: " + str(args.imbanlance_rate)
-            ,datetime.datetime.strftime(curr_time, '%Y-%m-%d %H:%M:%S')])
+    args.store_name = '_'.join([args.dataset, args.arch, str(args.imbanlance_rate),
+                                datetime.datetime.strftime(curr_time, '%Y-%m-%d')])
     prepare_folders(args)
     if args.seed is not None:
         random.seed(args.seed)

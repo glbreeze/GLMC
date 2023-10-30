@@ -1,19 +1,17 @@
 import sys
-import os
+import math
 import time
-import argparse
 import torch
-import torch.nn as nn
+import datetime
 import numpy as np
-import random
-from torch.backends import cudnn
+import torch.nn as nn
 import torch.nn.functional as F
+from torch.backends import cudnn
+from sklearn.metrics import confusion_matrix
+
 from utils import util
 from utils.util import *
-import datetime
-import math
-from sklearn.metrics import confusion_matrix
-import warnings
+from utils.measure_nc import analysis
 
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
@@ -154,20 +152,80 @@ class Trainer(object):
                 'best_acc1':  best_acc1,
             }, is_best, epoch + 1)
 
+    def train_base(self):
+        best_acc1 = 0
+        for epoch in range(self.start_epoch, self.epochs):
+            batch_time = AverageMeter('Time', ':6.3f')
+            losses = AverageMeter('Loss', ':.4e')
+
+            # switch to train mode
+            self.model.train()
+            end = time.time()
+
+            for i, (inputs, targets) in enumerate(self.train_loader):
+
+                inputs = inputs.cuda()
+                targets = targets.cuda()
+
+                output, output_cb, z, p = self.model(inputs, train=True)
+
+                criterion = nn.CrossEntropyLoss(reduction='mean')
+                loss = criterion(output, targets)
+                losses.update(loss.item(), inputs[0].size(0))
+
+                # compute gradient and do SGD step
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+                if i % self.print_freq == 0:
+                    output = 'Epoch: [{0}/{1}][{2}/{3}], Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+                        epoch + 1, self.epochs, i, len(self.train_loader), batch_time=batch_time, loss=losses)
+                    print(output)
+
+            self.log.info('EPOCH: {epoch} Train: Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+                epoch=epoch + 1, batch_time=batch_time, loss=losses))
+
+            # measure NC
+            if self.args.debug:
+                nc_dict = analysis(self.model, self.train_loader, self.args)
+                self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
+                    nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
+                    np.array2string(nc_dict['w_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                    np.array2string(nc_dict['h_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                    np.array2string(nc_dict['w_cos'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
+                ))
+
+            # evaluate on validation set
+            acc1 = self.validate(epoch=epoch)
+            if self.args.dataset == 'ImageNet-LT' or self.args.dataset == 'iNaturelist2018':
+                self.paco_adjust_learning_rate(self.optimizer, epoch, self.args)
+            else:
+                self.train_scheduler.step()
+
+            # remember best acc@1 and save checkpoint
+            is_best = acc1 > best_acc1
+            best_acc1 = max(acc1,  best_acc1)
+            output_best = 'Best Prec@1: %.3f\n' % (best_acc1)
+            print(output_best)
+            save_checkpoint(self.args, {
+                'epoch': epoch + 1,
+                'state_dict': self.model.state_dict(),
+                'best_acc1':  best_acc1,
+            }, is_best, epoch + 1)
+
     def validate(self,epoch=None):
         batch_time = AverageMeter('Time', ':6.3f')
         top1 = AverageMeter('Acc@1', ':6.2f')
         top5 = AverageMeter('Acc@5', ':6.2f')
-        eps = np.finfo(np.float64).eps
 
         # switch to evaluate mode
         self.model.eval()
         all_preds = []
         all_targets = []
-
-        confidence = np.array([])
-        pred_class = np.array([])
-        true_class = np.array([])
 
         with torch.no_grad():
             end = time.time()
@@ -192,31 +250,36 @@ class Trainer(object):
                 all_targets.extend(target.cpu().numpy())
 
                 if i % self.print_freq == 0:
-                    output = ('Test: [{0}/{1}]\t'
-                              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                              'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                    output = ('Test: [{0}/{1}], '
+                              'Time {batch_time.val:.3f} ({batch_time.avg:.3f}), '
+                              'Prec@1 {top1.val:.3f} ({top1.avg:.3f}), '
                               'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                         i, len(self.val_loader), batch_time=batch_time, top1=top1, top5=top5))
                     print(output)
-            cf = confusion_matrix(all_targets, all_preds).astype(float)
-            cls_cnt = cf.sum(axis=1)
-            cls_hit = np.diag(cf)
-            cls_acc = cls_hit / cls_cnt
-            output = ('EPOCH: {epoch} {flag} Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1 , flag='val', top1=top1, top5=top5))
 
-            self.log.info(output)
-            out_cls_acc = '%s Class Accuracy: %s' % (
-            'val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
+            cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
+            self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
+            self.log.info("many avg {:.2}, med avg {:.2}, few avg {:.2}".format(many_acc, medium_acc, few_acc))
+            out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
 
-            many_shot = self.cls_num_list > 100
-            medium_shot = (self.cls_num_list <= 100) & (self.cls_num_list > 20)
-            few_shot = self.cls_num_list <= 20
-            print("many avg, med avg, few avg",
-                  float(sum(cls_acc[many_shot]) * 100 / (sum(many_shot) + eps)),
-                  float(sum(cls_acc[medium_shot]) * 100 / (sum(medium_shot) + eps)),
-                  float(sum(cls_acc[few_shot]) * 100 / (sum(few_shot) + eps))
-                  )
         return top1.avg
+
+    def calculate_acc(self, targets, preds):
+        eps = np.finfo(np.float64).eps
+        cf = confusion_matrix(targets, preds).astype(float)
+        cls_cnt = cf.sum(axis=1)
+        cls_hit = np.diag(cf)
+        cls_acc = cls_hit / cls_cnt
+
+        many_shot = self.cls_num_list > 100
+        medium_shot = (self.cls_num_list <= 100) & (self.cls_num_list > 20)
+        few_shot = self.cls_num_list <= 20
+
+        many_acc = float(sum(cls_acc[many_shot]) * 100 / (sum(many_shot) + eps))
+        medium_acc = float(sum(cls_acc[medium_shot]) * 100 / (sum(medium_shot) + eps)),
+        few_acc = float(sum(cls_acc[few_shot]) * 100 / (sum(few_shot) + eps))
+
+        return cls_acc, many_acc, medium_acc, few_acc
 
     def SimSiamLoss(self,p, z, version='simplified'):  # negative cosine similarity
         z = z.detach()  # stop gradient

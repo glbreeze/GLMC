@@ -2,16 +2,12 @@
 import os
 import torch
 import random
-import pickle
 import numpy as np
-import torch.nn as nn
-import matplotlib.pyplot as plt
 from scipy.sparse.linalg import svds
 
 
-def analysis(model, criterion_summed, loader, args):
+def analysis(model, loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.eval()
 
     N    = [0 for _ in range(args.num_classes)]   # within class sample size
     mean = [0 for _ in range(args.num_classes)]
@@ -19,6 +15,8 @@ def analysis(model, criterion_summed, loader, args):
     loss = 0
     n_correct = 0
 
+    model.eval()
+    criterion_summed = torch.nn.CrossEntropyLoss(reduction='sum')
     for computation in ['Mean', 'Cov']:
         for batch_idx, (data, target) in enumerate(loader, start=1):
             data, target = data.to(device), target.to(device)
