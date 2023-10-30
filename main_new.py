@@ -132,7 +132,7 @@ def main_worker(gpu, args):
     start_time = time.time()
     print("Training started!")
     trainer = Trainer(args, model=model,train_loader=train_loader, val_loader=val_loader,weighted_train_loader=weighted_train_loader, per_class_num=cls_num_list,log=logging)
-    trainer.train()
+    trainer.train_base()
     end_time = time.time()
     print("It took {} to execute the program".format(hms_string(end_time - start_time)))
 
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     # train set
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
-    parser.add_argument('--root', type=str, default='/data/', help="dataset setting")
+    parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')

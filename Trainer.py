@@ -259,7 +259,7 @@ class Trainer(object):
 
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
             self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
-            self.log.info("many avg {:.2}, med avg {:.2}, few avg {:.2}".format(many_acc, medium_acc, few_acc))
+            self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
 
         return top1.avg
