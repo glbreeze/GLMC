@@ -104,8 +104,8 @@ class Trainer(object):
                                                                                         label_invs_w=one_hot_invs_w)
 
 
-                output_1, output_cb_1, z1, p1 = self.model(mix_x, train=True)
-                output_2, output_cb_2, z2, p2 = self.model(cut_x, train=True)
+                output_1, output_cb_1, z1, p1 = self.model(mix_x, ret='all')
+                output_2, output_cb_2, z2, p2 = self.model(cut_x, ret='all')
                 contrastive_loss = self.SimSiamLoss(p1, z2) + self.SimSiamLoss(p2, z1)
 
                 loss_mix = -torch.mean(torch.sum(F.log_softmax(output_1, dim=1) * mixup_y, dim=1))
@@ -168,7 +168,7 @@ class Trainer(object):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
 
-                output, output_cb, z, p = self.model(inputs, train=True)
+                output, output_cb, z, p = self.model(inputs, ret='all')
 
                 criterion = nn.CrossEntropyLoss(reduction='mean')
                 loss = criterion(output, targets)
@@ -236,7 +236,7 @@ class Trainer(object):
                 target = target.to(self.device)
 
                 # compute output
-                output = self.model(input, train=False)
+                output = self.model(input, ret='o')
 
                 # measure accuracy
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))

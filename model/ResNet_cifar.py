@@ -86,7 +86,7 @@ class ResNet_modify(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, train=False):
+    def forward(self, x, ret=None):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -94,16 +94,21 @@ class ResNet_modify(nn.Module):
         out = F.avg_pool2d(out, out.size()[3])
         feature = out.view(out.size(0), -1)
 
-        if train is True:
+        if ret is None:
+            out = self.fc_cb(feature)
+            return out
+        elif ret == 'o':
+            out = self.fc_cb(feature)
+            return out
+        elif ret == 'of':
+            out = self.fc_cb(feature)
+            return out, feature
+        elif ret == 'all':
             out = self.fc(feature)
             out_cb = self.fc_cb(feature)
             z = self.projection_head(feature)
             p = self.contrast_head(z)
             return out, out_cb, z, p
-        else:
-            out = self.fc_cb(feature)
-
-            return out
 
 
 class BasicBlock(nn.Module):

@@ -22,7 +22,7 @@ def analysis(model, loader, args):
             data, target = data.to(device), target.to(device)
 
             with torch.no_grad():
-                output, h = model(data, ret_feat=True)  # [B, C], [B, 512]
+                output, h = model(data, ret='of')  # [B, C], [B, 512]
 
             for c in range(args.num_classes):
                 idxs = (target == c).nonzero(as_tuple=True)[0]
