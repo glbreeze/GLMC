@@ -196,9 +196,9 @@ class Trainer(object):
                     nc_dict = analysis(self.model, self.train_loader, self.args)
                     self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
                         nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
-                        np.array2string(nc_dict['w_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                        np.array2string(nc_dict['h_norm'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                        np.array2string(nc_dict['w_cos'].numpy(), separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
+                        np.array2string(nc_dict['w_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['h_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['w_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
                     ))
 
             # evaluate on validation set

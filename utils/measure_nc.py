@@ -77,15 +77,15 @@ def analysis(model, loader, args):
 
     # mutual coherence
     W_nomarlized = W.T / W_norms
-    cos = ( W_nomarlized.T @ W_nomarlized ).numpy()  # [C, D] [D, C] -> [C, C]
+    cos = ( W_nomarlized.T @ W_nomarlized ).cpu().numpy()  # [C, D] [D, C] -> [C, C]
     cos_avg = (cos.sum(1) - np.diag(cos)) / (cos.shape[1] - 1)
 
     return {
         "loss": loss,
         "acc": acc,
         "nc1": nc1,
-        "w_norm": W_norms,
-        "h_norm": M_norms,
+        "w_norm": W_norms.cpu().numpy(),
+        "h_norm": M_norms.cpu().numpy(),
         "w_cos": cos_avg
     }
 
