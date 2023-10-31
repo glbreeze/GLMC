@@ -174,9 +174,9 @@ def save_checkpoint(args, state, is_best, epoch):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, filename.replace('pth.tar', 'best.pth.tar'))
-    if epoch % 20 == 0:
-        filename = '%s/%s/%s_ckpt.pth.tar' % (args.root_model, args.store_name, str(epoch))
-        torch.save(state, filename)
+    # if epoch % 20 == 0:
+    #     filename = '%s/%s/%s_ckpt.pth.tar' % (args.root_model, args.store_name, str(epoch))
+    #     torch.save(state, filename)
 
 def hms_string(sec_elapsed):
     h = int(sec_elapsed / (60 * 60))

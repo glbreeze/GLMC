@@ -155,6 +155,9 @@ if __name__ == '__main__':
     parser.add_argument('--contrast_weight', default=10,type=int,help='Mixture Consistency  Weights')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
 
+    parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
+    parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
+
     # etc.
     parser.add_argument('--seed', default=3407, type=int, help='seed for initializing training. ')
     parser.add_argument('-p', '--print_freq', default=1000, type=int, metavar='N',help='print frequency (default: 100)')
@@ -179,7 +182,11 @@ if __name__ == '__main__':
         args.num_classes = 8142
 
     curr_time = datetime.datetime.now()
-    args.store_name = '_'.join([args.dataset, args.arch, str(args.imbanlance_rate),
-                                datetime.datetime.strftime(curr_time, '%Y-%m-%d')])
+    file_name = args.store_name
+    args.store_name = '{}_{}/{}/{}_{}'.format(
+        args.dataset, args.arch,
+        str(args.imbanlance_rate),
+        file_name, datetime.datetime.strftime(curr_time, '%Y-%m-%d')
+    )
 
     main(args)

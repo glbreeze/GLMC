@@ -12,6 +12,7 @@ from utils import util
 from utils.util import *
 from utils.measure_nc import analysis
 from model.KNN_classifier import KNNClassifier
+from model.loss import CrossEntropyLabelSmooth
 
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
@@ -167,10 +168,12 @@ class Trainer(object):
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
-
                 output, output_cb, z, p = self.model(inputs, ret='all')
 
-                criterion = nn.CrossEntropyLoss(reduction='mean')               # train fc_bc
+                if self.args.loss == 'ce':
+                    criterion = nn.CrossEntropyLoss(reduction='mean')                # train fc_bc
+                elif self.args.loss == 'ls':
+                    criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
                 loss = criterion(output_cb, targets)
                 losses.update(loss.item(), inputs[0].size(0))
 
