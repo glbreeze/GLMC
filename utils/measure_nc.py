@@ -19,6 +19,8 @@ def analysis(model, loader, args):
     criterion_summed = torch.nn.CrossEntropyLoss(reduction='sum')
     for computation in ['Mean', 'Cov']:
         for batch_idx, (data, target) in enumerate(loader, start=1):
+            if isinstance(data, list): 
+                data = data[0]
             data, target = data.to(device), target.to(device)
 
             with torch.no_grad():
