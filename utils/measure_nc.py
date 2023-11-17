@@ -19,7 +19,7 @@ def analysis(model, loader, args):
     criterion_summed = torch.nn.CrossEntropyLoss(reduction='sum')
     for computation in ['Mean', 'Cov']:
         for batch_idx, (data, target) in enumerate(loader, start=1):
-            if isinstance(data, list): 
+            if isinstance(data, list):
                 data = data[0]
             data, target = data.to(device), target.to(device)
 
@@ -78,9 +78,13 @@ def analysis(model, loader, args):
     nc1 = np.trace(Sw @ inv_Sb)
 
     # mutual coherence
-    W_nomarlized = W.T / W_norms
+    W_nomarlized = W.T / W_norms   # [512, C]
     cos = ( W_nomarlized.T @ W_nomarlized ).cpu().numpy()  # [C, D] [D, C] -> [C, C]
     cos_avg = (cos.sum(1) - np.diag(cos)) / (cos.shape[1] - 1)
+
+    # angle between W and H
+    M_normalized = M_ / M_norms  # [512, C]
+    cos_wh = torch.sum(W_nomarlized*M_normalized, dim=0).cpu().numpy()  # [C]
 
     return {
         "loss": loss,
@@ -88,6 +92,8 @@ def analysis(model, loader, args):
         "nc1": nc1,
         "w_norm": W_norms.cpu().numpy(),
         "h_norm": M_norms.cpu().numpy(),
-        "w_cos": cos_avg
+        "w_cos": cos,
+        "w_cos_avg": cos_avg,
+        "wh_cos": cos_wh
     }
 

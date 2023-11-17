@@ -12,7 +12,7 @@ from utils import util
 from utils.util import *
 from utils.measure_nc import analysis
 from model.KNN_classifier import KNNClassifier
-from model.loss import CrossEntropyLabelSmooth
+from model.loss import CrossEntropyLabelSmooth, CDTLoss, LDTLoss
 
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
@@ -140,15 +140,21 @@ class Trainer(object):
                     
             # measure NC
             if self.args.debug>0:
-                if epoch % self.args.debug == 0:
+                if (epoch+1) % self.args.debug == 0:
                     nc_dict = analysis(self.model, self.train_loader, self.args)
-                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
+                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}\nWHcos:{}'.format(
                         nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
                         np.array2string(nc_dict['w_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['h_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                        np.array2string(nc_dict['w_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
+                        np.array2string(nc_dict['w_cos_avg'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['wh_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
                     ))
-                    
+                if (epoch+1) % (5*self.args.debug) == 0:
+                    filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
+                    import pickle
+                    pickle.dump(nc_dict, filename)
+                    self.log.info('-- Has saved the NC analysis result to {}'.format(filename))
+
             # evaluate on validation set
             acc1 = self.validate(epoch=epoch)
             if self.args.dataset == 'ImageNet-LT' or self.args.dataset == 'iNaturelist2018':
@@ -186,6 +192,9 @@ class Trainer(object):
                     criterion = nn.CrossEntropyLoss(reduction='mean')                # train fc_bc
                 elif self.args.loss == 'ls':
                     criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
+                elif self.args.loss == 'ldt':
+                    delta_list = self.cls_num_list / np.min(self.cls_num_list)
+                    criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
                 loss = criterion(output_cb, targets)
                 losses.update(loss.item(), inputs[0].size(0))
 
@@ -207,14 +216,20 @@ class Trainer(object):
 
             # measure NC
             if self.args.debug>0:
-                if epoch % self.args.debug == 0:
+                if (epoch+1) % self.args.debug == 0:
                     nc_dict = analysis(self.model, self.train_loader, self.args)
-                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}'.format(
+                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}\nWHcos:{}'.format(
                         nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
                         np.array2string(nc_dict['w_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['h_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                        np.array2string(nc_dict['w_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
+                        np.array2string(nc_dict['w_cos_avg'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
+                        np.array2string(nc_dict['wh_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
                     ))
+                    if (epoch+1) % (self.args.debug*5) ==0:
+                        filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
+                        import pickle
+                        pickle.dump(nc_dict, filename)
+                        self.log.info('-- Has saved the NC analysis result to {}'.format(filename))
 
             # evaluate on validation set
             if self.args.knn:

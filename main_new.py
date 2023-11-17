@@ -100,7 +100,7 @@ def main_worker(gpu, args):
             print("=> no checkpoint found at '{}'".format(args.resume))
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M')
-    fh = logging.FileHandler(os.path.join(args.root_log + args.store_name, 'log.txt'))
+    fh = logging.FileHandler(os.path.join(args.root_model + args.store_name, 'log.txt'))
     fh.setFormatter(logging.Formatter(log_format))
     logger = logging.getLogger()
     logger.addHandler(fh)
@@ -165,7 +165,6 @@ if __name__ == '__main__':
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',help='number of data loading workers (default: 4)')
     parser.add_argument('--resume', default=None, type=str, metavar='PATH',help='path to latest checkpoint (default: none)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',help='manual epoch number (useful on restarts)')
-    parser.add_argument('--root_log', type=str, default='./output/')
     parser.add_argument('--root_model', type=str, default='./output/')
     parser.add_argument('--store_name', type=str, default='name')
     parser.add_argument('--debug',  type=int, default=10)
