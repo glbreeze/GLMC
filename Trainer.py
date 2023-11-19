@@ -152,7 +152,8 @@ class Trainer(object):
                 if (epoch+1) % (5*self.args.debug) == 0:
                     filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
                     import pickle
-                    pickle.dump(nc_dict, filename)
+                    with open(filename, 'wb') as f:
+                        pickle.dump(nc_dict, f)
                     self.log.info('-- Has saved the NC analysis result to {}'.format(filename))
 
             # evaluate on validation set
@@ -228,7 +229,8 @@ class Trainer(object):
                     if (epoch+1) % (self.args.debug*5) ==0:
                         filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
                         import pickle
-                        pickle.dump(nc_dict, filename)
+                        with open(filename, 'wb') as f:
+                            pickle.dump(nc_dict, f)
                         self.log.info('-- Has saved the NC analysis result to {}'.format(filename))
 
             # evaluate on validation set
