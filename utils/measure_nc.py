@@ -82,8 +82,12 @@ def analysis(model, loader, args):
     cos = ( W_nomarlized.T @ W_nomarlized ).cpu().numpy()  # [C, D] [D, C] -> [C, C]
     cos_avg = (cos.sum(1) - np.diag(cos)) / (cos.shape[1] - 1)
 
-    # angle between W and H
+    # angle between H
     M_normalized = M_ / M_norms  # [512, C]
+    h_cos = (M_normalized.T @ M_normalized).cpu().numpy()
+    h_cos_avg = (h_cos.sum(1)-np.diag(h_cos)) / (h_cos.shape[1]-1)
+
+    # angle between W and H
     cos_wh = torch.sum(W_nomarlized*M_normalized, dim=0).cpu().numpy()  # [C]
 
     return {
@@ -94,6 +98,8 @@ def analysis(model, loader, args):
         "h_norm": M_norms.cpu().numpy(),
         "w_cos": cos,
         "w_cos_avg": cos_avg,
+        "h_cos":h_cos,
+        "h_cos_avg": h_cos_avg,
         "wh_cos": cos_wh
     }
 

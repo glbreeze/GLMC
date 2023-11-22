@@ -187,22 +187,46 @@ class Trainer(object):
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
-                output, output_cb, z, p = self.model(inputs, ret='all')
 
-                if self.args.loss == 'ce':
-                    criterion = nn.CrossEntropyLoss(reduction='mean')                # train fc_bc
-                elif self.args.loss == 'ls':
-                    criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
-                elif self.args.loss == 'ldt':
-                    delta_list = self.cls_num_list / np.min(self.cls_num_list)
-                    criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
-                loss = criterion(output_cb, targets)
-                losses.update(loss.item(), inputs[0].size(0))
+                if self.args.loss != 'hce':
+                    if self.args.loss == 'ce':
+                        criterion = nn.CrossEntropyLoss(reduction='mean')                # train fc_bc
+                    elif self.args.loss == 'ls':
+                        criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
+                    elif self.args.loss == 'ldt':
+                        delta_list = self.cls_num_list / np.min(self.cls_num_list)
+                        criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
 
-                # compute gradient and do SGD step
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                    output, output_cb, z, p = self.model(inputs, ret='all')
+                    loss = criterion(output_cb, targets)
+                    losses.update(loss.item(), inputs[0].size(0))
+
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
+
+                elif self.args.loss == 'hce':
+                    criterion = nn.CrossEntropyLoss(reduction='mean')
+                    criterion_cb = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights)
+                    feat_params = []
+                    for n, p in self.model.named_parameters():
+                        if 'fc' not in n:
+                            feat_params.append(p)
+                    optimizer_cls = torch.optim.SGD(self.model.fc_cb.parameters(),momentum=0.9, lr=self.lr,weight_decay=self.args.weight_decay)
+                    optimizer_feat = torch.optim.SGD(feat_params, momentum=0.9, lr=self.lr,weight_decay=self.args.weight_decay)
+
+                    output, output_cb, z, p = self.model(inputs, ret='all')
+                    loss_cb = criterion_cb(output_cb, targets)
+                    optimizer_cls.zero_grad()
+                    loss_cb.backward(retain_graph=True)
+                    optimizer_cls.step()
+
+                    output, output_cb, z, p = self.model(inputs, ret='all')
+                    loss = criterion(output_cb, targets)
+                    losses.update(loss.item(), inputs[0].size(0))
+                    optimizer_feat.zero_grad()
+                    loss.backward()
+                    optimizer_feat.step()
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
