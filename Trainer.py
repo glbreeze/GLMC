@@ -105,8 +105,8 @@ class Trainer(object):
                                                                                         label_invs_w=one_hot_invs_w)
 
 
-                output_1, output_cb_1, z1, p1 = self.model(mix_x, ret='all')
-                output_2, output_cb_2, z2, p2 = self.model(cut_x, ret='all')
+                output_1, output_cb_1, z1, p1, _ = self.model(mix_x, ret='all')
+                output_2, output_cb_2, z2, p2, _ = self.model(cut_x, ret='all')
                 contrastive_loss = self.SimSiamLoss(p1, z2) + self.SimSiamLoss(p2, z1)
 
                 loss_mix = -torch.mean(torch.sum(F.log_softmax(output_1, dim=1) * mixup_y, dim=1))
@@ -187,6 +187,7 @@ class Trainer(object):
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
+                output, output_cb, z, p, h = self.model(inputs, ret='all')
 
                 if self.args.loss != 'hce':
                     if self.args.loss == 'ce':
@@ -197,7 +198,6 @@ class Trainer(object):
                         delta_list = self.cls_num_list / np.min(self.cls_num_list)
                         criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
 
-                    output, output_cb, z, p = self.model(inputs, ret='all')
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
 
@@ -207,26 +207,27 @@ class Trainer(object):
 
                 elif self.args.loss == 'hce':
                     criterion = nn.CrossEntropyLoss(reduction='mean')
-                    criterion_cb = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights)
-                    feat_params = []
-                    for n, p in self.model.named_parameters():
-                        if 'fc' not in n:
-                            feat_params.append(p)
-                    optimizer_cls = torch.optim.SGD(self.model.fc_cb.parameters(),momentum=0.9, lr=self.lr,weight_decay=self.args.weight_decay)
-                    optimizer_feat = torch.optim.SGD(feat_params, momentum=0.9, lr=self.lr,weight_decay=self.args.weight_decay)
 
-                    output, output_cb, z, p = self.model(inputs, ret='all')
-                    loss_cb = criterion_cb(output_cb, targets)
-                    optimizer_cls.zero_grad()
-                    loss_cb.backward(retain_graph=True)
-                    optimizer_cls.step()
+                    # gradient of L wrt. b
+                    beta = self.per_cls_weights[targets]           # [B]
+                    P = nn.Softmax(dim=-1)(output_cb.detach())     # [B, K]
+                    Y = torch.eye(self.args.num_classes, device=targets.device)[targets]  # [B, K]
+                    b_grad = beta.unsqueeze(1) * (P-Y)             # [B, K]
+                    b_grad = torch.sum(b_grad, dim=0)/len(b_grad)
 
-                    output, output_cb, z, p = self.model(inputs, ret='all')
+                    # gradient of L wrt. W
+                    weighted_P_Y = (P.detach()-Y) * beta.unsqueeze(1)                                # [B, K]
+                    W_grad = torch.einsum('db, bk->dk', h.detach().T, weighted_P_Y)/len(output_cb)   # [D, K]
+                    W_grad = W_grad.T    # [K, D]
+
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
-                    optimizer_feat.zero_grad()
+                    self.optimizer.zero_grad()
                     loss.backward()
-                    optimizer_feat.step()
+                    self.model.fc_cb.bias.grad = b_grad
+                    self.model.fc_cb.weight.grad = W_grad
+
+                    self.optimizer.step()
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
