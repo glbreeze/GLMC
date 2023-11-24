@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from tensorboardX import SummaryWriter
 from sklearn.metrics import confusion_matrix
 
 from utils import util
@@ -38,6 +39,9 @@ class Trainer(object):
         self.beta = args.beta
         self.update_weight()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # for writing summary
+        path = os.path.join(args.root_model, args.store_name, 'log')
+        self.writer = SummaryWriter(path)
 
     def update_weight(self):
         per_cls_weights = 1.0 / (np.array(self.cls_num_list) ** self.label_weighting)
@@ -178,6 +182,7 @@ class Trainer(object):
         for epoch in range(self.start_epoch, self.epochs):
             batch_time = AverageMeter('Time', ':6.3f')
             losses = AverageMeter('Loss', ':.4e')
+            train_acc = AverageMeter('Train_acc', ':.4e')
 
             # switch to train mode
             self.model.train()
@@ -202,6 +207,9 @@ class Trainer(object):
 
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
+                    train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item()/inputs[0].size(0),
+                                     inputs[0].size(0)
+                                     )
 
                     self.optimizer.zero_grad()
                     loss.backward()
@@ -238,6 +246,11 @@ class Trainer(object):
                     output = 'Epoch: [{0}/{1}][{2}/{3}], Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                         epoch + 1, self.epochs, i, len(self.train_loader), batch_time=batch_time, loss=losses)
                     print(output)
+                    self.writer.add_scalar('train_loss', losses.avg, epoch * len(self.train_loader) + i)
+                    self.writer.add_scalar('train_acc', train_acc.avg, epoch * len(self.train_loader) + i)
+                    self.writer.add_scalar('lr', self.optimizer.param_groups[0]['lr'], epoch * len(self.train_loader) + i)
+                    losses.reset()
+                    train_acc.reset()
 
             self.log.info('EPOCH: {epoch} Train: Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                 epoch=epoch + 1, batch_time=batch_time, loss=losses))
@@ -323,11 +336,20 @@ class Trainer(object):
                     print(output)
 
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
-            self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
+            self.log.info('====> EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
+            self.log.info(out_cls_acc)
+
+            self.writer.add_scalar('val_acc1', top1.avg, epoch)
+            self.writer.add_scalar('val_acc5', top5.avg, epoch)
+            self.writer.add_scalar('val_many', many_acc, epoch)
+            self.writer.add_scalar('val_medium', medium_acc, epoch)
+            self.writer.add_scalar('val_few', few_acc, epoch)
+
 
         return top1.avg
+
 
     def validate_knn(self,epoch=None):
         batch_time = AverageMeter('Time', ':6.3f')
@@ -374,6 +396,14 @@ class Trainer(object):
             self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
+
+            self.log.info(out_cls_acc)
+
+            self.writer.add_scalar('val_acc1', top1.avg, epoch)
+            self.writer.add_scalar('val_acc5', top5.avg, epoch)
+            self.writer.add_scalar('val_many', many_acc, epoch)
+            self.writer.add_scalar('val_medium', medium_acc, epoch)
+            self.writer.add_scalar('val_few', few_acc, epoch)
 
         return top1.avg
 

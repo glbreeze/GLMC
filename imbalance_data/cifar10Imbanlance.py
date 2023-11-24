@@ -9,7 +9,7 @@ class Cifar10Imbanlance(Dataset):
                  train=True, transform=None, label_align=True, ):
         self.transform = transform
         self.label_align = label_align
-        assert 0.0 < imbanlance_rate < 1, "imbanlance_rate must 0.0 < imbanlance_rate < 1"
+        assert 0.0 < imbanlance_rate <= 1, "imbanlance_rate must 0.0 < imbanlance_rate <= 1"
         self.imbanlance_rate = imbanlance_rate
 
         self.num_cls = num_cls

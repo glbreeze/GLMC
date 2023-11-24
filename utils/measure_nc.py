@@ -9,9 +9,9 @@ from scipy.sparse.linalg import svds
 def analysis(model, loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    N    = [0 for _ in range(args.num_classes)]   # within class sample size
-    mean = [0 for _ in range(args.num_classes)]
-    Sw   = 0
+    N      = [0 for _ in range(args.num_classes)]   # within class sample size
+    mean   = [0 for _ in range(args.num_classes)]
+    Sw_cls = [0 for _ in range(args.num_classes)]
     loss = 0
     n_correct = 0
 
@@ -42,7 +42,7 @@ def analysis(model, loader, args):
                 elif computation == 'Cov':
                     z = h_c - mean[c].unsqueeze(0)  # [B, 512]
                     cov = torch.matmul(z.unsqueeze(-1), z.unsqueeze(1))   # [B 512 1] [B 1 512] -> [B, 512, 512]
-                    Sw += torch.sum(cov, dim=0)     # [512, 512]
+                    Sw_cls[c] += torch.sum(cov, dim=0)     # [512, 512]
 
                     # during calculation of within-class covariance, calculate network's accuracy
                     net_pred = torch.argmax(output[idxs, :], dim=1)
@@ -51,9 +51,11 @@ def analysis(model, loader, args):
         if computation == 'Mean':
             for c in range(args.num_classes):
                 mean[c] /= N[c]
-                M = torch.stack(mean).T
+            M = torch.stack(mean).T
         elif computation == 'Cov':
-            Sw /= sum(N)
+            Sw_all = sum(Sw_cls)           # [512, 512]
+            for c in range(args.num_classes):
+                Sw_cls[c] = Sw_cls/N[c]
 
     loss /= sum(N)
     acc = n_correct / sum(N)
@@ -63,19 +65,21 @@ def analysis(model, loader, args):
     M_ = M - muG  # [512, C]
     Sb = torch.matmul(M_, M_.T) / args.num_classes
 
+    # nc1 = tr{Sw Sb^-1}
+    Sw = Sw_all.cpu().numpy()
+    Sb = Sb.cpu().numpy()
+    eigvec, eigval, _ = svds(Sb, k=args.num_classes - 1)
+    inv_Sb = eigvec @ np.diag(eigval ** (-1)) @ eigvec.T
+    nc1 = np.trace(Sw @ inv_Sb)
+    nc1_cls = [np.trace(Sw_cls1.cpu().numpy() @ inv_Sb) for Sw_cls1 in Sw_cls]
+    nc1_cls = np.array(nc1_cls)
+
     # avg norm
     W = model.fc_cb.weight.detach()       # [C, 512]
     M_norms = torch.norm(M_, dim=0)   # [C]
     W_norms = torch.norm(W.T, dim=0)  # [C]
     #h_norm_cov = (torch.std(M_norms) / torch.mean(M_norms)).item()
     #w_norm_cov = (torch.std(W_norms) / torch.mean(W_norms)).item()
-
-    # nc1 = tr{Sw Sb^-1}
-    Sw = Sw.cpu().numpy()
-    Sb = Sb.cpu().numpy()
-    eigvec, eigval, _ = svds(Sb, k=args.num_classes - 1)
-    inv_Sb = eigvec @ np.diag(eigval ** (-1)) @ eigvec.T
-    nc1 = np.trace(Sw @ inv_Sb)
 
     # mutual coherence
     W_nomarlized = W.T / W_norms   # [512, C]
@@ -94,6 +98,7 @@ def analysis(model, loader, args):
         "loss": loss,
         "acc": acc,
         "nc1": nc1,
+        "nc1_cls": nc1_cls,
         "w_norm": W_norms.cpu().numpy(),
         "h_norm": M_norms.cpu().numpy(),
         "w_cos": cos,
