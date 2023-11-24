@@ -74,6 +74,14 @@ def main_worker(gpu, args):
     args.gpu = gpu
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
+    log_format = '%(asctime)s %(message)s'
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M')
+    fh = logging.FileHandler(os.path.join(args.root_model + args.store_name, 'log.txt'))
+    fh.setFormatter(logging.Formatter(log_format))
+    logger = logging.getLogger()
+    logger.addHandler(fh)
+    logging.info(args)
+    
     # create model
     model = get_model(args)
     _ = print_model_param_nums(model=model)
@@ -98,12 +106,6 @@ def main_worker(gpu, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-    log_format = '%(asctime)s %(message)s'
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M')
-    fh = logging.FileHandler(os.path.join(args.root_model + args.store_name, 'log.txt'))
-    fh.setFormatter(logging.Formatter(log_format))
-    logger = logging.getLogger()
-    logger.addHandler(fh)
 
     # Data loading code
     train_dataset,val_dataset = get_dataset(args)

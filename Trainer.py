@@ -197,6 +197,8 @@ class Trainer(object):
                     elif self.args.loss == 'ldt':
                         delta_list = self.cls_num_list / np.min(self.cls_num_list)
                         criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
+                    elif self.args.loss == 'wce': 
+                        criterion = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights) 
 
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
