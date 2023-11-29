@@ -1,6 +1,7 @@
 import sys
 import math
 import time
+import wandb
 import torch
 import datetime
 import numpy as np
@@ -179,6 +180,23 @@ class Trainer(object):
 
     def train_base(self):
         best_acc1 = 0
+
+        if self.args.loss == 'ce':
+            criterion = nn.CrossEntropyLoss(reduction='mean')  # train fc_bc
+        elif self.args.loss == 'ls':
+            criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
+        elif self.args.loss == 'ldt':
+            delta_list = self.cls_num_list / np.min(self.cls_num_list)
+            criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
+        elif self.args.loss == 'wce':
+            criterion = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights)
+        elif self.args.loss == 'hce':
+            criterion = nn.CrossEntropyLoss(reduction='mean')
+
+        # tell wandb to watch what the model gets up to: gradients, weights, and more!
+        wandb.watch(self.model, criterion, log="all", log_freq=10)
+
+        num_iter = 0
         for epoch in range(self.start_epoch, self.epochs):
             batch_time = AverageMeter('Time', ':6.3f')
             losses = AverageMeter('Loss', ':.4e')
@@ -194,22 +212,13 @@ class Trainer(object):
                 train_loader = self.train_loader
                 
             for i, (inputs, targets) in enumerate(train_loader):
+                num_iter += 1
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 output, output_cb, z, p, h = self.model(inputs, ret='all')
 
                 if self.args.loss != 'hce':
-                    if self.args.loss == 'ce':
-                        criterion = nn.CrossEntropyLoss(reduction='mean')                # train fc_bc
-                    elif self.args.loss == 'ls':
-                        criterion = CrossEntropyLabelSmooth(self.args.num_classes, epsilon=self.args.eps)
-                    elif self.args.loss == 'ldt':
-                        delta_list = self.cls_num_list / np.min(self.cls_num_list)
-                        criterion = LDTLoss(delta_list, gamma=0.5, device=self.device)
-                    elif self.args.loss == 'wce': 
-                        criterion = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights) 
-
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
                     train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item()/inputs[0].size(0),
@@ -250,10 +259,10 @@ class Trainer(object):
                 if i % self.print_freq == 0:
                     output = 'Epoch: [{0}/{1}][{2}/{3}], Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                         epoch + 1, self.epochs, i, len(self.train_loader), batch_time=batch_time, loss=losses)
-                    print(output)
-                    self.writer.add_scalar('train_loss', losses.avg, epoch * len(self.train_loader) + i)
-                    self.writer.add_scalar('train_acc', train_acc.avg, epoch * len(self.train_loader) + i)
-                    self.writer.add_scalar('lr', self.optimizer.param_groups[0]['lr'], epoch * len(self.train_loader) + i)
+                    wandb.log({'train/train_loss': losses.avg,
+                               'train/train_acc': train_acc.avg,
+                               'lr': self.optimizer.param_groups[0]['lr']},
+                              step=num_iter)
                     losses.reset()
                     train_acc.reset()
 
@@ -346,11 +355,13 @@ class Trainer(object):
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
             self.log.info(out_cls_acc)
 
-            self.writer.add_scalar('val_acc1', top1.avg, epoch)
-            self.writer.add_scalar('val_acc5', top5.avg, epoch)
-            self.writer.add_scalar('val_many', many_acc, epoch)
-            self.writer.add_scalar('val_medium', medium_acc, epoch)
-            self.writer.add_scalar('val_few', few_acc, epoch)
+            wandb.log({
+                'val/val_acc1': top1.avg,
+                'val/val_acc5': top5.avg,
+                'val/val_many': many_acc,
+                'val/val_medium': medium_acc,
+                'val/val_few': few_acc
+            })
 
 
         return top1.avg
@@ -404,11 +415,13 @@ class Trainer(object):
 
             self.log.info(out_cls_acc)
 
-            self.writer.add_scalar('val_acc1', top1.avg, epoch)
-            self.writer.add_scalar('val_acc5', top5.avg, epoch)
-            self.writer.add_scalar('val_many', many_acc, epoch)
-            self.writer.add_scalar('val_medium', medium_acc, epoch)
-            self.writer.add_scalar('val_few', few_acc, epoch)
+            wandb.log({
+                'val/val_acc1': top1.avg,
+                'val/val_acc5': top5.avg,
+                'val/val_many': many_acc,
+                'val/val_medium': medium_acc,
+                'val/val_few': few_acc
+            })
 
         return top1.avg
 
