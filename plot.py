@@ -5,7 +5,7 @@ import pickle
 import numpy as np 
 from matplotlib import pyplot as plt
 
-root = f"/scratch/lg154/sseg/GLMC/output/cifar10_resnet32/0.01/{sys.argv[1]}"
+root = f"/scratch/lg154/sseg/GLMC/output/cifar10_resnet32/{sys.argv[1]}"
 
 epoch = sys.argv[2]
 
@@ -16,7 +16,10 @@ with open(file, 'rb') as f:
 
 
 # Plot for w_cos
-k_lst = [k for k in nc_dt if k.endswith('_cos') or k.endswith('_norm')]
+k_lst = [k for k in nc_dt if k.endswith('_cos') or k.endswith('_norm') 
+         # or k=='nc1_cls'
+         ]
+#print(nc_dt['nc1_cls'])
 fig, axes = plt.subplots(nrows=3, ncols=2)
 k = 0
 for key in k_lst:

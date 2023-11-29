@@ -53,9 +53,9 @@ def analysis(model, loader, args):
                 mean[c] /= N[c]
             M = torch.stack(mean).T
         elif computation == 'Cov':
-            Sw_all = sum(Sw_cls)           # [512, 512]
+            Sw_all = sum(Sw_cls) / sum(N)           # [512, 512]
             for c in range(args.num_classes):
-                Sw_cls[c] = Sw_cls/N[c]
+                Sw_cls[c] = Sw_cls[c]/N[c]
 
     loss /= sum(N)
     acc = n_correct / sum(N)

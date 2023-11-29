@@ -187,8 +187,13 @@ class Trainer(object):
             # switch to train mode
             self.model.train()
             end = time.time()
-
-            for i, (inputs, targets) in enumerate(self.train_loader):
+            
+            if self.args.resample_weighting > 0: 
+                train_loader = self.weighted_train_loader 
+            else: 
+                train_loader = self.train_loader
+                
+            for i, (inputs, targets) in enumerate(train_loader):
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
