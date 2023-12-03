@@ -217,10 +217,10 @@ if __name__ == '__main__':
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name
-    args.store_name = '{}_{}/{}/{}_{}'.format(
+    args.store_name = '{}_{}/{}/{}'.format(
         args.dataset, args.arch,
         str(args.imbanlance_rate),
-        file_name, datetime.datetime.strftime(curr_time, '%Y-%m-%d')
+        file_name
     )
 
     main(args)

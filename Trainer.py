@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 
 from utils import util
 from utils.util import *
+from utils.plot import plot_nc
 from utils.measure_nc import analysis
 from model.KNN_classifier import KNNClassifier
 from model.loss import CrossEntropyLabelSmooth, CDTLoss, LDTLoss
@@ -217,20 +218,18 @@ class Trainer(object):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 output, output_cb, z, p, h = self.model(inputs, ret='all')
+                train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
+                                 targets.size(0)
+                                 )
+                loss = criterion(output_cb, targets)
+                losses.update(loss.item(), targets.size(0))
 
                 if self.args.loss != 'hce':
-                    loss = criterion(output_cb, targets)
-                    losses.update(loss.item(), inputs[0].size(0))
-                    train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item()/targets.size(0),
-                                     targets.size(0)
-                                     )
-
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
 
                 elif self.args.loss == 'hce':
-                    criterion = nn.CrossEntropyLoss(reduction='mean')
 
                     # gradient of L wrt. b
                     beta = self.per_cls_weights[targets]           # [B]
@@ -244,13 +243,10 @@ class Trainer(object):
                     W_grad = torch.einsum('db, bk->dk', h.detach().T, weighted_P_Y)/len(output_cb)   # [D, K]
                     W_grad = W_grad.T    # [K, D]
 
-                    loss = criterion(output_cb, targets)
-                    losses.update(loss.item(), inputs[0].size(0))
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.model.fc_cb.bias.grad = b_grad
                     self.model.fc_cb.weight.grad = W_grad
-
                     self.optimizer.step()
 
                 # measure elapsed time
@@ -266,7 +262,7 @@ class Trainer(object):
                     losses.reset()
                     train_acc.reset()
 
-            self.log.info('EPOCH: {epoch} Train: Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+            self.log.info('====>EPOCH: {epoch} Train: Time {batch_time.val:.3f} ({batch_time.avg:.3f}), Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                 epoch=epoch + 1, batch_time=batch_time, loss=losses))
 
             # measure NC
@@ -280,7 +276,10 @@ class Trainer(object):
                         np.array2string(nc_dict['w_cos_avg'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['wh_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
                     ))
+                    # wandb.log({'nc/loss': nc_dict['loss'], 'nc/acc': nc_dict['acc'], 'nc/nc1': nc_dict['nc1']}, step=num_iter)
                     if (epoch+1) % (self.args.debug*5) ==0:
+                        fig = plot_nc(nc_dict)
+                        wandb.log({"chart": fig}, step=num_iter)
                         filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
                         import pickle
                         with open(filename, 'wb') as f:
