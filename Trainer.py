@@ -221,8 +221,8 @@ class Trainer(object):
                 if self.args.loss != 'hce':
                     loss = criterion(output_cb, targets)
                     losses.update(loss.item(), inputs[0].size(0))
-                    train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item()/inputs[0].size(0),
-                                     inputs[0].size(0)
+                    train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item()/targets.size(0),
+                                     targets.size(0)
                                      )
 
                     self.optimizer.zero_grad()
@@ -389,8 +389,8 @@ class Trainer(object):
 
                 # measure accuracy
                 acc1, acc5 = accuracy(logit, target, topk=(1, 5))
-                top1.update(acc1.item(), input.size(0))
-                top5.update(acc5.item(), input.size(0))
+                top1.update(acc1.item(), target.size(0))
+                top5.update(acc5.item(), target.size(0))
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
@@ -409,7 +409,7 @@ class Trainer(object):
                     print(output)
 
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
-            self.log.info('EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
+            self.log.info('====> EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
 
@@ -466,7 +466,7 @@ class Trainer(object):
             param_group['lr'] = lr
 
     def get_knncentroids(self):
-        print('===> Calculating KNN centroids.')
+        # print('===> Calculating KNN centroids.')
 
         torch.cuda.empty_cache()
         self.model.eval()
