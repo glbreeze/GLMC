@@ -22,13 +22,13 @@ def analysis(model, loader, args):
 
         data, target = data.to(device), target.to(device)
         with torch.no_grad():
-            output, h = model(data, ret_feat=True)  # [B, C], [B, 512]
+            output, h = model(data, ret='of')  # [B, C], [B, 512]
 
         loss += criterion_summed(output, target).item()
         net_pred = torch.argmax(output, dim=1)
         n_correct += torch.sum(net_pred == target).item()
 
-        for c in range(args.C):
+        for c in range(args.num_classes):
             idxs = torch.where(target == c)[0]
 
             if len(idxs) > 0:  # If no class-c in this batch
@@ -43,9 +43,9 @@ def analysis(model, loader, args):
     for batch_idx, (data, target) in enumerate(loader, start=1):
         data, target = data.to(device), target.to(device)
         with torch.no_grad():
-            output, h = model(data, ret_feat=True)  # [B, C], [B, 512]
+            output, h = model(data, ret='of')  # [B, C], [B, 512]
 
-        for c in range(args.C):
+        for c in range(args.num_classes):
             idxs = torch.where(target == c)[0]
             if len(idxs) > 0:  # If no class-c in this batch
                 h_c = h[idxs, :]  # [B, 512]
@@ -59,7 +59,7 @@ def analysis(model, loader, args):
 
     # between-class covariance
     M_ = M - muG  # [512, C]
-    Sb = torch.matmul(M_, M_.T) / args.C
+    Sb = torch.matmul(M_, M_.T) / args.num_classes
 
     # ============== NC1 ==============
     Sw_all = sum(Sw_cls) / sum(N)  # [512, 512]
