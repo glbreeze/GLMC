@@ -24,13 +24,13 @@ def get_model(args):
     else:
         print("=> creating model '{}'".format(args.arch))
         if args.arch == 'resnet50':
-            net = ResNet_cifar.resnet50(num_class=args.num_classes)
+            net = ResNet_cifar.resnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet18':
-            net = ResNet_cifar.resnet18(num_class=args.num_classes)
+            net = ResNet_cifar.resnet18(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet32':
-            net = ResNet_cifar.resnet32(num_class=args.num_classes)
+            net = ResNet_cifar.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet34':
-            net = ResNet_cifar.resnet34(num_class=args.num_classes)
+            net = ResNet_cifar.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
         return net
 
 
@@ -188,6 +188,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
+    parser.add_argument('--etf_cls', default=False, action='store_true')
+    parser.add_argument('--mixup', type=int, default=-1, help='flag for using mixup, -1 means no mixup')
+    parser.add_argument('--mixup_alpha', type=float, default=0.0, help='alpha parameter for mixup')
 
     # etc.
     parser.add_argument('--seed', default=3407, type=int, help='seed for initializing training. ')

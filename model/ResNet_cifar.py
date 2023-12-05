@@ -1,5 +1,7 @@
 import torch.nn as nn
 import torch
+import random
+import numpy as np
 import torch.nn.init as init
 
 def _weights_init(m):
@@ -53,9 +55,10 @@ class BasicBlock_s(nn.Module):
 
 class ResNet_modify(nn.Module):
 
-    def __init__(self, block, num_blocks, num_classes=100, nf=64):
+    def __init__(self, block, num_blocks, num_classes=100, nf=64, etf_cls=False):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
+        self.num_classes = num_classes
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_planes)
@@ -66,8 +69,17 @@ class ResNet_modify(nn.Module):
 
         self.fc = nn.Linear(self.out_dim, num_classes)
         # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
-        hidden_dim = 128
         self.fc_cb = nn.Linear(self.out_dim, num_classes)
+
+        if etf_cls:
+            weight = torch.sqrt(torch.tensor(num_classes / (num_classes - 1))) * (
+                    torch.eye(num_classes) - (1 / num_classes) * torch.ones((num_classes, num_classes)))
+            weight /= torch.sqrt((1 / num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
+
+            self.fc_cb.weight = nn.Parameter(torch.mm(weight, torch.eye(num_classes, self.out_dim)))  # [K, d]
+            self.fc_cb.weight.requires_grad_(False)
+
+        hidden_dim = 128
         self.contrast_head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
         )
@@ -109,6 +121,69 @@ class ResNet_modify(nn.Module):
             z = self.projection_head(feature)
             p = self.contrast_head(z)
             return out, out_cb, z, p, feature
+
+    def forward_mixup1(self, x, target=None, mixup=None, mixup_alpha=None):
+
+        if mixup >= 0 and mixup <= 3:
+            layer_mix = mixup
+        elif mixup == 9:
+            layer_mix = random.randint(1,3)
+        else:
+            layer_mix = None
+
+        if mixup_alpha is not None:
+            lam = get_lambda(mixup_alpha)
+            lam = torch.tensor([lam], dtype =torch.float32, device=x.device)
+            lam = torch.autograd.Variable(lam)
+
+        target = to_one_hot(target, self.num_classes)
+        if layer_mix == 0:
+            x, target = mixup_process(x, target, lam)
+
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        if layer_mix == 1:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.layer2(x)
+        if layer_mix == 2:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.layer3(x)
+        if layer_mix == 3:
+            x, target = mixup_process(x, target, lam)
+
+        feat = F.avg_pool2d(x, x.size()[3])
+        feat = feat.view(feat.size(0), -1)
+        out = self.fc_cb(feat)
+
+        return out, target, feat
+
+
+def get_lambda(alpha=1.0):
+    '''Return lambda'''
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.
+    return lam
+
+
+def to_one_hot(inp, num_classes):
+    if inp is not None:
+        y_onehot = torch.FloatTensor(inp.size(0), num_classes)
+        y_onehot.zero_()
+        y_onehot.scatter_(1, inp.unsqueeze(1).data.cpu(), 1)
+        return torch.autograd.Variable(y_onehot.cuda(), requires_grad=False)
+    else:
+        return None
+
+
+def mixup_process(out, target, lam):
+    indices = np.random.permutation(out.size(0))
+    out = out * lam + out[indices] * (1 - lam)
+    target = target * lam + target[indices] * (1 - lam)
+    return out, target
 
 
 class BasicBlock(nn.Module):
@@ -252,33 +327,33 @@ class ResNet(nn.Module):
             return out
 
 
-def resnet18(num_class=100):
+def resnet18(num_class=100, etf_cls=False):
     """ return a ResNet 18 object
     """
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, etf_cls=etf_cls)
 
-def resnet32(num_class=10):
-    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class)
+def resnet32(num_class=10, etf_cls=False):
+    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, etf_cls=etf_cls)
 
-def resnet34(num_class=100):
+def resnet34(num_class=100, etf_cls=False):
     """ return a ResNet 34 object
     """
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_class=num_class)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_class=num_class, etf_cls=etf_cls)
 
 
-def resnet50(num_class=100):
+def resnet50(num_class=100, etf_cls=False):
     """ return a ResNet 50 object
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3], num_class=num_class)
+    return ResNet(BottleNeck, [3, 4, 6, 3], num_class=num_class, etf_cls=etf_cls)
 
 
-def resnet101(num_class=100):
+def resnet101(num_class=100, etf_cls=False):
     """ return a ResNet 101 object
     """
-    return ResNet(BottleNeck, [3, 4, 23, 3], num_class=num_class)
+    return ResNet(BottleNeck, [3, 4, 23, 3], num_class=num_class, etf_cls=etf_cls)
 
 
-def resnet152(num_class=100):
+def resnet152(num_class=100, etf_cls=False):
     """ return a ResNet 152 object
     """
-    return ResNet(BottleNeck, [3, 8, 36, 3], num_class=num_class)
+    return ResNet(BottleNeck, [3, 8, 36, 3], num_class=num_class, etf_cls=etf_cls)

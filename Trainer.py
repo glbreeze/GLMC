@@ -193,6 +193,8 @@ class Trainer(object):
             criterion = nn.CrossEntropyLoss(reduction='mean', weight=self.per_cls_weights)
         elif self.args.loss == 'hce':
             criterion = nn.CrossEntropyLoss(reduction='mean')
+        elif self.args.loss == 'bce':
+            criterion = nn.BCELoss(reduction='mean')
 
         # tell wandb to watch what the model gets up to: gradients, weights, and more!
         wandb.watch(self.model, criterion, log="all", log_freq=10)
@@ -217,11 +219,14 @@ class Trainer(object):
 
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
-                output, output_cb, z, p, h = self.model(inputs, ret='all')
+                if self.args.mixup >= 0:
+                    output_cb, reweighted_targets, h = self.model.forward_mixup1(inputs, targets, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
+                else:
+                    output, output_cb, z, p, h = self.model(inputs, ret='all')
                 train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
                                  targets.size(0)
                                  )
-                loss = criterion(output_cb, targets)
+                loss = criterion(output_cb, reweighted_targets if self.args.mixup >= 0 else targets)
                 losses.update(loss.item(), targets.size(0))
 
                 if self.args.loss != 'hce':
