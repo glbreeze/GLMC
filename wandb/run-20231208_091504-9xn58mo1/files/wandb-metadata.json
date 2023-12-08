@@ -1,0 +1,47 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.8.3",
+    "heartbeatAt": "2023-12-08T01:15:05.886557",
+    "startedAt": "2023-12-08T01:15:04.279374",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--mode=client",
+        "--port=60289"
+    ],
+    "state": "running",
+    "program": "<python with no main file>",
+    "codePathLocal": null,
+    "git": {
+        "remote": "https://github.com/glbreeze/GLMC.git",
+        "commit": "6a3a0f0a00b379aa347863deac716c813514d6b9"
+    },
+    "email": "glbreeze@gmail.com",
+    "root": "/Users/lg154/Documents/research/models/GLMC",
+    "host": "NYUSH2480LP-MX.local",
+    "username": "lg154",
+    "executable": "/Users/lg154/anaconda3/bin/python",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2600,
+        "min": 2600,
+        "max": 2600
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2600,
+            "min": 2600,
+            "max": 2600
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 465.62699127197266,
+            "used": 363.1242561340332
+        }
+    },
+    "memory": {
+        "total": 32.0
+    }
+}

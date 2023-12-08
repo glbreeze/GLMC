@@ -59,6 +59,7 @@ class ResNet_modify(nn.Module):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
         self.num_classes = num_classes
+        self.etf_cls = etf_cls
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_planes)
@@ -71,14 +72,6 @@ class ResNet_modify(nn.Module):
         # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
         self.fc_cb = nn.Linear(self.out_dim, num_classes)
 
-        if etf_cls:
-            weight = torch.sqrt(torch.tensor(num_classes / (num_classes - 1))) * (
-                    torch.eye(num_classes) - (1 / num_classes) * torch.ones((num_classes, num_classes)))
-            weight /= torch.sqrt((1 / num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
-
-            self.fc_cb.weight = nn.Parameter(torch.mm(weight, torch.eye(num_classes, self.out_dim)))  # [K, d]
-            self.fc_cb.weight.requires_grad_(False)
-
         hidden_dim = 128
         self.contrast_head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
@@ -88,6 +81,14 @@ class ResNet_modify(nn.Module):
 
         )
         self.apply(_weights_init)
+
+        if etf_cls:
+            weight = torch.sqrt(torch.tensor(num_classes / (num_classes - 1))) * (
+                    torch.eye(num_classes) - (1 / num_classes) * torch.ones((num_classes, num_classes)))
+            weight /= torch.sqrt((1 / num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
+
+            self.fc_cb.weight = nn.Parameter(torch.mm(weight, torch.eye(num_classes, self.out_dim)))  # [K, d]
+            self.fc_cb.weight.requires_grad_(False)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1] * (num_blocks - 1)

@@ -78,9 +78,11 @@ def main(args):
         cudnn.benchmark = True
 
     os.environ["WANDB_API_KEY"] = "0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee"
-    os.environ["WANDB_MODE"] = "dryrun"
+    os.environ["WANDB_MODE"] = "online" #"dryrun"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="lt")
+    wandb.init(project="lt",
+               name=args.store_name
+               )
     wandb.config.update(args)
     main_worker(args.gpu, wandb.config)
 
