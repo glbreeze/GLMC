@@ -3,14 +3,15 @@ import torch
 import random
 import numpy as np
 import torch.nn.init as init
+import torch.nn.functional as F
+from .utils import *
+
 
 def _weights_init(m):
     classname = m.__class__.__name__
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         init.kaiming_normal_(m.weight)
 
-
-import torch.nn.functional as F
 
 class LambdaLayer(nn.Module):
 
@@ -52,6 +53,74 @@ class BasicBlock_s(nn.Module):
         out += self.shortcut(x)
         out = F.relu(out)
         return out
+
+
+class BasicBlock(nn.Module):
+    """Basic Block for resnet 18 and resnet 34
+    """
+    # BasicBlock and BottleNeck block
+    # have different output size
+    # we use class attribute expansion
+    # to distinct
+    expansion = 1
+
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+
+        # residual function
+        self.residual_function = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+        )
+
+        # shortcut
+        self.shortcut = nn.Sequential()
+
+        # the shortcut output dimension is not the same with residual function
+        # use 1*1 convolution to match the dimension
+        if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+            )
+
+    def forward(self, x):
+        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+
+
+class BottleNeck(nn.Module):
+    """Residual block for resnet over 50 layers
+
+    """
+    expansion = 4
+
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+        self.residual_function = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels * BottleNeck.expansion),
+        )
+
+        self.shortcut = nn.Sequential()
+
+        if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
+                nn.BatchNorm2d(out_channels * BottleNeck.expansion)
+            )
+
+    def forward(self, x):
+        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+
 
 class ResNet_modify(nn.Module):
 
@@ -123,18 +192,18 @@ class ResNet_modify(nn.Module):
             p = self.contrast_head(z)
             return out, out_cb, z, p, feature
 
-    def forward_mixup1(self, x, target=None, mixup=None, mixup_alpha=None):
+    def forward_mixup(self, x, target=None, mixup=None, mixup_alpha=None):
 
         if mixup >= 0 and mixup <= 3:
             layer_mix = mixup
         elif mixup == 9:
-            layer_mix = random.randint(1,3)
+            layer_mix = random.randint(0, 3)
         else:
             layer_mix = None
 
         if mixup_alpha is not None:
             lam = get_lambda(mixup_alpha)
-            lam = torch.tensor([lam], dtype =torch.float32, device=x.device)
+            lam = torch.tensor([lam], dtype=torch.float32, device=x.device)
             lam = torch.autograd.Variable(lam)
 
         target = to_one_hot(target, self.num_classes)
@@ -159,99 +228,6 @@ class ResNet_modify(nn.Module):
         out = self.fc_cb(feat)
 
         return out, target, feat
-
-
-def get_lambda(alpha=1.0):
-    '''Return lambda'''
-    if alpha > 0.:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1.
-    return lam
-
-
-def to_one_hot(inp, num_classes):
-    if inp is not None:
-        y_onehot = torch.FloatTensor(inp.size(0), num_classes)
-        y_onehot.zero_()
-        y_onehot.scatter_(1, inp.unsqueeze(1).data.cpu(), 1)
-        return torch.autograd.Variable(y_onehot.cuda(), requires_grad=False)
-    else:
-        return None
-
-
-def mixup_process(out, target, lam):
-    indices = np.random.permutation(out.size(0))
-    out = out * lam + out[indices] * (1 - lam)
-    target = target * lam + target[indices] * (1 - lam)
-    return out, target
-
-
-class BasicBlock(nn.Module):
-    """Basic Block for resnet 18 and resnet 34
-    """
-    # BasicBlock and BottleNeck block
-    # have different output size
-    # we use class attribute expansion
-    # to distinct
-    expansion = 1
-
-    def __init__(self, in_channels, out_channels, stride=1):
-        super().__init__()
-
-        # residual function
-        self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels * BasicBlock.expansion)
-        )
-
-        # shortcut
-        self.shortcut = nn.Sequential()
-
-        # the shortcut output dimension is not the same with residual function
-        # use 1*1 convolution to match the dimension
-        if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
-            )
-
-    def forward(self, x):
-        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
-
-
-class BottleNeck(nn.Module):
-    """Residual block for resnet over 50 layers
-
-    """
-    expansion = 4
-
-    def __init__(self, in_channels, out_channels, stride=1):
-        super().__init__()
-        self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels * BottleNeck.expansion),
-        )
-
-        self.shortcut = nn.Sequential()
-
-        if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
-                nn.BatchNorm2d(out_channels * BottleNeck.expansion)
-            )
-
-    def forward(self, x):
-        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
 
 
 class ResNet(nn.Module):
@@ -309,7 +285,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, train=False):
+    def forward(self, x, ret=None):
         output = self.conv1(x)
         output = self.conv2_x(output)
         output = self.conv3_x(output)
@@ -317,7 +293,7 @@ class ResNet(nn.Module):
         output = self.conv5_x(output)
         output = self.avg_pool(output)
         feature = output.view(output.size(0), -1)
-        if train is True:
+        if ret== 'all':
             out = self.fc(feature)
             out_cb = self.fc_cb(feature)
             z = self.projection_head(feature)
@@ -326,6 +302,49 @@ class ResNet(nn.Module):
         else:
             out = self.fc_cb(feature)
             return out
+
+    def forward_mixup(self, x, target=None, mixup=None, mixup_alpha=None):
+        if mixup >= 0 and mixup <= 5:
+            layer_mix = mixup
+        elif mixup == 9:
+            layer_mix = random.randint(0, 5)
+        else:
+            layer_mix = None
+
+        if mixup_alpha is not None:
+            lam = get_lambda(mixup_alpha)
+            lam = torch.tensor([lam], dtype =torch.float32, device=x.device)
+            lam = torch.autograd.Variable(lam)
+
+        target = to_one_hot(target, self.num_classes)
+        if layer_mix == 0:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.conv1(x)
+        if layer_mix == 1:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.conv2_x(x)
+        if layer_mix == 2:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.conv3_x(x)
+        if layer_mix == 3:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.conv4_x(x)
+        if layer_mix == 4:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.conv5_x(x)
+        if layer_mix == 5:
+            x, target = mixup_process(x, target, lam)
+
+        x = self.avg_pool(x)
+        feat = x.view(x.size(0), -1)
+
+        out = self.fc_cb(feat)
+        return out, target, feat
 
 
 def resnet18(num_class=100, etf_cls=False):

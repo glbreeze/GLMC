@@ -5,6 +5,18 @@ import random
 import numpy as np
 from scipy.sparse.linalg import svds
 
+
+def compute_ETF(W, device):  # W [K, 512]
+    K = W.shape[0]
+    # W = W - torch.mean(W, dim=0, keepdim=True)
+    WWT = torch.mm(W, W.T)            # [K, 512] [512, K] -> [K, K]
+    WWT /= torch.norm(WWT, p='fro')   # [K, K]
+
+    sub = (torch.eye(K) - 1 / K * torch.ones((K, K))).to(device) / pow(K - 1, 0.5)
+    ETF_metric = torch.norm(WWT - sub, p='fro')
+    return ETF_metric.detach().cpu().numpy().item()
+
+
 def analysis(model, loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -83,10 +95,14 @@ def analysis(model, loader, args):
     M_norms = torch.norm(M_, dim=0)  # [C]
     W_norms = torch.norm(W , dim=0)  # [C]
 
+    # == NC2.1
+    norm_M_CoV = (torch.std(M_norms) / torch.mean(M_norms)).item()
+    norm_W_CoV = (torch.std(W_norms) / torch.mean(W_norms)).item()
+
     # angle between W
     W_nomarlized = W / W_norms  # [512, C]
-    cos = (W_nomarlized.T @ W_nomarlized).cpu().numpy()  # [C, D] [D, C] -> [C, C]
-    cos_avg = (cos.sum(1) - np.diag(cos)) / (cos.shape[1] - 1)
+    w_cos = (W_nomarlized.T @ W_nomarlized).cpu().numpy()  # [C, D] [D, C] -> [C, C]
+    w_cos_avg = (w_cos.sum(1) - np.diag(w_cos)) / (w_cos.shape[1] - 1)
 
     # angle between H
     M_normalized = M_ / M_norms  # [512, C]
@@ -96,6 +112,25 @@ def analysis(model, loader, args):
     # angle between W and H
     wh_cos = torch.sum(W_nomarlized * M_normalized, dim=0).cpu().numpy()  # [C]
 
+    # == NC2.2
+    def coherence(V):
+        G = V.T @ V  # [C, D] [D, C]
+        G += torch.ones((args.C, args.C), device=device) / (args.C - 1)
+        G -= torch.diag(torch.diag(G))  # [C, C]
+        return torch.norm(G, 1).item() / (args.C * (args.C - 1))
+
+    cos_M = coherence(M_ / M_norms)  # [D, C]
+    cos_W = coherence(W / W_norms)
+
+    # =========== NC2
+    nc2_h = compute_ETF(M_.T, device)
+    nc2_w = compute_ETF(W.T, device)
+
+    # =========== NC3  ||W^T - M_||
+    normalized_M = M_ / torch.norm(M_, 'fro')
+    normalized_W = W / torch.norm(W, 'fro')
+    W_M_dist = (torch.norm(normalized_W - normalized_M) ** 2).item()
+
     return {
         "loss": loss,
         "acc": acc,
@@ -103,11 +138,18 @@ def analysis(model, loader, args):
         "nc1_cls": nc1_cls,
         "w_norm": W_norms.cpu().numpy(),
         "h_norm": M_norms.cpu().numpy(),
-        "w_cos": cos,
-        "w_cos_avg": cos_avg,
+        "w_cos": w_cos,
+        "w_cos_avg": w_cos_avg,
         "h_cos": h_cos,
         "h_cos_avg": h_cos_avg,
-        "wh_cos": wh_cos
+        "wh_cos": wh_cos, 
+        "nc21_h": norm_M_CoV,
+        "nc21_w": norm_W_CoV,
+        "nc22_h": cos_M,
+        "nc22_w": cos_W,
+        "nc2_h": nc2_h,
+        "nc2_w": nc2_w,
+        "nc3": W_M_dist,
     }
 
 

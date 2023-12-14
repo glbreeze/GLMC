@@ -220,7 +220,7 @@ class Trainer(object):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
                 if self.args.mixup >= 0:
-                    output_cb, reweighted_targets, h = self.model.forward_mixup1(inputs, targets, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
+                    output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
                 else:
                     output, output_cb, z, p, h = self.model(inputs, ret='all')
                 train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
@@ -274,11 +274,10 @@ class Trainer(object):
             if self.args.debug>0:
                 if (epoch+1) % self.args.debug == 0:
                     nc_dict = analysis(self.model, self.train_loader, self.args)
-                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}\nWHcos:{}'.format(
-                        nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
+                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f}, NC2h:{:.3f}, NC2W:{:.3f}, NC3:{:.3f}\nWnorm:{}\nHnorm:{}\nWHcos:{}'.format(
+                        nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'], nc_dict['nc2_h'], nc_dict['nc2_w'], nc_dict['nc3'],
                         np.array2string(nc_dict['w_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['h_norm'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
-                        np.array2string(nc_dict['w_cos_avg'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['wh_cos'], separator=',', formatter={'float_kind': lambda x: "%.3f" % x})
                     ))
                     # wandb.log({'nc/loss': nc_dict['loss'], 'nc/acc': nc_dict['acc'], 'nc/nc1': nc_dict['nc1']}, step=num_iter)
@@ -354,7 +353,7 @@ class Trainer(object):
                     print(output)
 
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets, all_preds)
-            self.log.info('====> EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
+            self.log.info('----> EPOCH: {epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
             out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
             self.log.info(out_cls_acc)
