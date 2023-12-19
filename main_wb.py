@@ -79,8 +79,10 @@ def main(args):
 
     os.environ["WANDB_API_KEY"] = "0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee"
     os.environ["WANDB_MODE"] = "online" #"dryrun"
+    os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
+    os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="lt",
+    wandb.init(project="sf100",
                name=args.store_name
                )
     wandb.config.update(args)
@@ -192,7 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
     parser.add_argument('--etf_cls', default=False, action='store_true')
     parser.add_argument('--mixup', type=int, default=-1, help='flag for using mixup, -1 means no mixup')
-    parser.add_argument('--mixup_alpha', type=float, default=0.0, help='alpha parameter for mixup')
+    parser.add_argument('--mixup_alpha', type=float, default=1.0, help='alpha parameter for mixup')
 
     # etc.
     parser.add_argument('--seed', default=3407, type=int, help='seed for initializing training. ')

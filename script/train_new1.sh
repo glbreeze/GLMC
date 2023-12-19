@@ -10,9 +10,6 @@
 #SBATCH --partition=a100_1,a100_2,v100,rtx8000
 
 # job info
-MIXUP=$1
-ALPHA=$2
-
 
 # Singularity path
 ext3_path=/scratch/$USER/overlay-25GB-500K.ext3
@@ -23,6 +20,6 @@ singularity exec --nv \
 --overlay ${ext3_path}:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_wb.py --dataset cifar100 -a resnet32 --imbanlance_rate 1 --beta 0.5 --lr 0.01 \
- --epochs 200 --loss ce --resample_weighting 0 --mixup ${MIXUP} --mixup_alpha ${ALPHA} --store_name ce_mx${MIXUP}a${ALPHA}
+python main_wb.py --dataset cifar10 -a resnet32 --imbanlance_rate 1 --beta 0.5 --lr 0.01 \
+ --epochs 200 --loss ce --resample_weighting 0 --etf_cls --mixup 2 --mixup_alpha 2 --knn --store_name ncc_ce_etf_mx2a2
 "

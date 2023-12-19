@@ -115,9 +115,9 @@ def analysis(model, loader, args):
     # == NC2.2
     def coherence(V):
         G = V.T @ V  # [C, D] [D, C]
-        G += torch.ones((args.C, args.C), device=device) / (args.C - 1)
+        G += torch.ones((args.num_classes, args.num_classes), device=device) / (args.num_classes - 1)
         G -= torch.diag(torch.diag(G))  # [C, C]
-        return torch.norm(G, 1).item() / (args.C * (args.C - 1))
+        return torch.norm(G, 1).item() / (args.num_classes * (args.num_classes - 1))
 
     cos_M = coherence(M_ / M_norms)  # [D, C]
     cos_W = coherence(W / W_norms)
