@@ -9,6 +9,35 @@ import utils.moco_loader as moco_loader
 from utils.randaugment import rand_augment_transform
 
 
+class Graph_Vars:
+    def __init__(self):
+        self.epoch = []
+        self.acc = []
+        self.loss = []
+
+        self.nc1 = []
+
+        self.nc2_h = []
+        self.nc2_w =[]
+        self.nc21_h = []
+        self.nc22_h = []
+        self.nc21_w = []
+        self.nc22_w = []
+
+        self.nc3 = []
+
+        self.lr = []
+
+    def load_dt(self, nc_dt, epoch, lr=None):
+        self.epoch.append(epoch)
+        if lr:
+            self.lr.append(lr)
+        for key in nc_dt:
+            try:
+                self.__getattribute__(key).append(nc_dt[key])
+            except:
+                print('{} is not attribute of Graph var'.format(key))
+
 class TwoCropTransform:
     """Create two crops of the same image"""
 

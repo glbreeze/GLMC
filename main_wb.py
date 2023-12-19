@@ -82,7 +82,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="sf100",
+    wandb.init(project="CF100",
                name=args.store_name
                )
     wandb.config.update(args)
