@@ -23,6 +23,15 @@ class Graph_Vars:
         self.nc22_h = []
         self.nc21_w = []
         self.nc22_w = []
+        
+        self.nc1_cls = []
+        self.w_norm = []
+        self.h_norm = []
+        self.w_cos = []
+        self.w_cos_avg = []
+        self.h_cos = []
+        self.h_cos_avg = []
+        self.wh_cos = []
 
         self.nc3 = []
 
