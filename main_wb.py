@@ -5,6 +5,7 @@ import logging
 import datetime
 import argparse
 from torch.backends import cudnn
+import torch.nn as nn
 
 from utils import util
 from utils.util import *
@@ -12,6 +13,7 @@ from Trainer import Trainer
 from model import Resnet_LT
 from model import ResNet_cifar
 from imbalance_data import cifar10Imbanlance, cifar100Imbanlance, dataset_lt_data
+from imbalance_data.data import get_dataset
 
 best_acc1 = 0
 
@@ -31,38 +33,11 @@ def get_model(args):
             net = ResNet_cifar.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet34':
             net = ResNet_cifar.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
+
+        if args.dataset == 'fmnist':
+            net.conv1[0] = torch.nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)
+
         return net
-
-
-def get_dataset(args):
-    transform_train, transform_val = util.get_transform(args.dataset)
-    if args.dataset == 'cifar10':
-        trainset = cifar10Imbanlance.Cifar10Imbanlance(transform=transform_train, imbanlance_rate=args.imbanlance_rate,
-                                                       train=True, file_path=args.root)
-        testset = cifar10Imbanlance.Cifar10Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
-                                                      transform=transform_val, file_path=args.root)
-        print("load cifar10")
-        return trainset, testset
-
-    if args.dataset == 'cifar100':
-        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=transform_train,
-                                                         imbanlance_rate=args.imbanlance_rate, train=True,
-                                                         file_path=os.path.join(args.root, 'cifar-100-python/'))
-        testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
-                                                        transform=transform_val,
-                                                        file_path=os.path.join(args.root, 'cifar-100-python/'))
-        print("load cifar100")
-        return trainset, testset
-
-    if args.dataset == 'ImageNet-LT':
-        trainset = dataset_lt_data.LT_Dataset(args.root, args.dir_train_txt, util.TwoCropTransform(transform_train))
-        testset = dataset_lt_data.LT_Dataset(args.root, args.dir_test_txt, transform_val)
-        return trainset, testset
-
-    if args.dataset == 'iNaturelist2018':
-        trainset = dataset_lt_data.LT_Dataset(args.root, args.dir_train_txt, util.TwoCropTransform(transform_train))
-        testset = dataset_lt_data.LT_Dataset(args.root, args.dir_test_txt, transform_val)
-        return trainset, testset
 
 
 def main(args):
@@ -104,7 +79,7 @@ def main_worker(gpu, args):
     logger.addHandler(fh)
     logging.info(args)
 
-    # create model
+    # ==================== create model
     model = get_model(args)
     _ = print_model_param_nums(model=model)
     if args.gpu is not None:
@@ -129,7 +104,7 @@ def main_worker(gpu, args):
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
-    # Data loading code
+    # ================= Data loading code
     train_dataset, val_dataset = get_dataset(args)
     num_classes = len(np.unique(train_dataset.targets))
     assert num_classes == args.num_classes
@@ -213,7 +188,7 @@ if __name__ == '__main__':
     parser.add_argument('--knn', default=False, action='store_true')
     args = parser.parse_args()
 
-    if args.dataset == 'cifar10':
+    if args.dataset == 'cifar10' or args.dataset == 'fmnist':
         args.num_classes = 10
     elif args.dataset == 'cifar100':
         args.num_classes = 100
@@ -221,6 +196,8 @@ if __name__ == '__main__':
         args.num_classes = 1000
     elif args.dataset == 'iNaturelist2018':
         args.num_classes = 8142
+    elif args.dataset == 'tinyi':
+        args.num_classes = 200
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name
