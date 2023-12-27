@@ -35,14 +35,14 @@ def analysis(model, loader, args):
             data, target = data.to(device), target.to(device)
 
             with torch.no_grad():
-                output, h = model(data, ret='of')  # [B, C], [B, 512]
+                output, h = model(data, ret='of')  # [B, C], [B, 256]
 
             for c in range(args.num_classes):
-                idxs = (target == c).nonzero(as_tuple=True)[0]
+                idxs = (target == c).nonzero(as_tuple=True)[0] # idxs of class-c in this batch
                 if len(idxs) == 0:  # If no class-c in this batch
                     continue
 
-                h_c = h[idxs, :]  # [B, 512]
+                h_c = h[idxs, :]  # [num_of_class-c_in_batch, 512]
 
                 if computation == 'Mean':
                     # update class means
@@ -86,9 +86,9 @@ def analysis(model, loader, args):
     Sb = Sb.cpu().numpy()
     eigvec, eigval, _ = svds(Sb, k=args.num_classes - 1)
     inv_Sb = eigvec @ np.diag(eigval ** (-1)) @ eigvec.T
-    nc1 = np.trace(Sw @ inv_Sb)
+    nc1 = np.trace(Sw @ inv_Sb) # [1]
     nc1_cls = [np.trace(Sw_cls1.cpu().numpy() @ inv_Sb) for Sw_cls1 in Sw_cls]
-    nc1_cls = np.array(nc1_cls)
+    nc1_cls = np.array(nc1_cls) # [C]
 
     # ========== NC2.1 and NC2.2
     W = model.fc_cb.weight.detach().T  # [512, C]

@@ -204,9 +204,9 @@ class ResNet_modify(nn.Module):
         if mixup_alpha is not None:
             lam = get_lambda(mixup_alpha)
             lam = torch.tensor([lam], dtype=torch.float32, device=x.device)
-            lam = torch.autograd.Variable(lam)
+            lam = torch.autograd.Variable(lam) # [1]
 
-        target = to_one_hot(target, self.num_classes)
+        target = to_one_hot(target, self.num_classes) # [B, C]
         if layer_mix == 0:
             x, target = mixup_process(x, target, lam)
 

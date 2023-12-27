@@ -14,6 +14,7 @@ from model import Resnet_LT
 from model import ResNet_cifar
 from imbalance_data import cifar10Imbanlance, cifar100Imbanlance, dataset_lt_data
 from imbalance_data.data import get_dataset
+import pdb
 
 best_acc1 = 0
 
@@ -52,12 +53,12 @@ def main(args):
         cudnn.deterministic = True
         cudnn.benchmark = True
 
-    os.environ["WANDB_API_KEY"] = "0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee"
+    os.environ["WANDB_API_KEY"] = "1682ce21dab1a4ce453300f7dc065512c4ed0c87"
     os.environ["WANDB_MODE"] = "online" #"dryrun"
-    os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
-    os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
-    wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="CF10",
+    # os.environ["WANDB_CACHE_DIR"] = "/scratch/lg3490/sseg/.cache/wandb"
+    # os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg3490/sseg/.config/wandb"
+    wandb.login(key='1682ce21dab1a4ce453300f7dc065512c4ed0c87', relogin=True)
+    wandb.init(project=args.dataset,
                name=args.store_name
                )
     wandb.config.update(args)
@@ -120,14 +121,14 @@ def main_worker(gpu, args):
     cls_num_list = [0] * num_classes
     for label in train_dataset.targets:
         cls_num_list[label] += 1
-    cls_num_list = np.array(cls_num_list)
+    cls_num_list = np.array(cls_num_list) # number of samples per class
 
     # weighted_loader
-    cls_weight = 1.0 / (cls_num_list ** args.resample_weighting)
+    cls_weight = 1.0 / (cls_num_list ** args.resample_weighting) # resample_weighting is between 0 and 1, 0 means sample balanced, 1 means class balanced
     cls_weight = cls_weight / np.sum(cls_weight) * len(cls_num_list)
-    samples_weight = np.array([cls_weight[t] for t in train_dataset.targets])
+    samples_weight = np.array([cls_weight[t] for t in train_dataset.targets]) # weight of each sample
     samples_weight = torch.from_numpy(samples_weight)
-    samples_weight = samples_weight.double()
+    samples_weight = samples_weight.double() # double precision
     weighted_sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
     weighted_train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                                         num_workers=args.workers, persistent_workers=True,

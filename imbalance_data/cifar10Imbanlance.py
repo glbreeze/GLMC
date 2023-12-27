@@ -43,14 +43,14 @@ class Cifar10Imbanlance(Dataset):
         y_train = np.array(y_train)
 
         data_percent = []
-        data_num = int(x_train.shape[0] / self.num_cls)
+        data_num = int(x_train.shape[0] / self.num_cls) # average number of a class
 
         for cls_idx in range(self.num_cls):
             if train:
-                num = data_num * (imbanlance_rate ** (cls_idx / (self.num_cls - 1)))
+                num = data_num * (imbanlance_rate ** (cls_idx / (self.num_cls - 1)))  # number of samples of each class
                 data_percent.append(int(num))
             else:
-                num = data_num
+                num = data_num     # when testing, each class has the same number of samples
                 data_percent.append(int(num))
         self.class_list = data_percent
         if train:
@@ -62,19 +62,19 @@ class Cifar10Imbanlance(Dataset):
         rehearsal_label = None
         for i in range(1, self.num_cls + 1):
             index = (y_train >= i - 1) & (y_train < i)
-            task_train_x = x_train[index]
-            label = y_train[index]
+            task_train_x = x_train[index] # get all samples of a class
+            label = y_train[index] # get all labels of a class
 
             data_num = task_train_x.shape[0]
-            index = np.random.choice(data_num, data_percent[i - 1],replace=False)
-            tem_data = task_train_x[index]
-            tem_label = label[index]
+            index = np.random.choice(data_num, data_percent[i - 1],replace=False) # randomly choose samples of a class
+            tem_data = task_train_x[index] # get the data of the chosen samples
+            tem_label = label[index] # get the label of the chosen samples
             if rehearsal_data is None:
-                rehearsal_data = tem_data
+                rehearsal_data = tem_data 
                 rehearsal_label = tem_label
             else:
-                rehearsal_data = np.concatenate([rehearsal_data, tem_data], axis=0)
-                rehearsal_label = np.concatenate([rehearsal_label, tem_label], axis=0)
+                rehearsal_data = np.concatenate([rehearsal_data, tem_data], axis=0) # concatenate the data of all classes
+                rehearsal_label = np.concatenate([rehearsal_label, tem_label], axis=0) # concatenate the label of all classes
 
         task_split = {
             "x": rehearsal_data,

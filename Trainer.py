@@ -13,10 +13,12 @@ from sklearn.metrics import confusion_matrix
 
 from utils import util
 from utils.util import *
-from utils.plot import plot_nc
+# from utils.plot import plot_nc
 from utils.measure_nc import analysis
 from model.KNN_classifier import KNNClassifier
 from model.loss import CrossEntropyLabelSmooth, CDTLoss, LDTLoss
+
+import pdb
 
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
@@ -36,7 +38,7 @@ class Trainer(object):
         self.cls_num_list = per_class_num
         self.contrast_weight = args.contrast_weight
         self.model = model
-        self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr,weight_decay=args.weight_decay)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=self.lr, weight_decay=args.weight_decay)
         self.train_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs)
         self.log = log
         self.beta = args.beta
@@ -193,19 +195,19 @@ class Trainer(object):
             train_loader = self.train_loader
 
         for i, (inputs, targets) in enumerate(train_loader):
-
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            inputs = inputs.to(self.device) # [B, 3, 32, 32]
+            targets = targets.to(self.device) # [B]
             if self.args.mixup >= 0:
                 output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
                                                                             mixup_alpha=self.args.mixup_alpha)
+                # output_cb: [B, C], reweighted_targets: [B, C], h: [B, D]
             else:
                 output, output_cb, z, p, h = self.model(inputs, ret='all')
 
             # ==== update loss and acc
             train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
-                             )
+                             ) # train_acc.val to get the current loss
             loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 else targets)
             losses.update(loss.item(), targets.size(0))
 
@@ -268,11 +270,13 @@ class Trainer(object):
             wandb.log({'train/train_loss': losses.avg,
                        'train/train_acc': train_acc.avg,
                        'lr': self.optimizer.param_groups[0]['lr']},
-                      step=epoch+1)
+                       step=epoch+1)
 
             # measure NC
-            if self.args.debug>0:
-                if (epoch+1) % self.args.debug == 0:
+            if self.args.debug > 0:
+                # if (epoch + 1) % self.args.debug == 0:
+                if (epoch + 1) % 1 == 0:
+                    # pdb.set_trace()
                     nc_dict = analysis(self.model, self.train_loader, self.args)
                     self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f}, NC2h:{:.3f}, NC2W:{:.3f}, NC3:{:.3f}'.format(
                         nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'], nc_dict['nc2_h'], nc_dict['nc2_w'], nc_dict['nc3'],
@@ -289,8 +293,8 @@ class Trainer(object):
                                'nc/nc3':  nc_dict['nc3']},
                               step=epoch+1)
                     if (epoch+1) % (self.args.debug*5) ==0:
-                        fig = plot_nc(nc_dict)
-                        wandb.log({"chart": fig}, step=epoch+1)
+                        # fig = plot_nc(nc_dict)
+                        # wandb.log({"chart": fig}, step=epoch+1)
 
                         filename = os.path.join(self.args.root_model, self.args.store_name, 'analysis{}.pkl'.format(epoch))
                         with open(filename, 'wb') as f:
@@ -310,7 +314,7 @@ class Trainer(object):
 
             # remember best acc@1 and save checkpoint
             is_best = acc1 > best_acc1
-            best_acc1 = max(acc1,  best_acc1)
+            best_acc1 = max(acc1, best_acc1)
             save_checkpoint(self.args, {
                 'epoch': epoch + 1,
                 'state_dict': self.model.state_dict(),
