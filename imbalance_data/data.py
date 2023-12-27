@@ -26,13 +26,13 @@ def get_dataset(args):
         print("load cifar100")
         return trainset, testset
 
-    elif args.dset == 'fmnist':
+    elif args.dataset == 'fmnist':
         fashion_mnist = torchvision.datasets.FashionMNIST(download=True, train=True, root="data").train_data.float()
         trainset = datasets.FashionMNIST("data", download=True, train=True, transform=transform_train)
         testset = datasets.FashionMNIST("data", download=True, train=False, transform=transform_val)
         return trainset, testset
 
-    elif args.dset == 'tinyi':  # image_size:64 x 64
+    elif args.dataset == 'tinyi':  # image_size:64 x 64
         trainset = datasets.ImageFolder(os.path.join(data_folder, 'tiny-imagenet-200', 'train'), transform_train)
         testset = datasets.ImageFolder(os.path.join(data_folder, 'tiny-imagenet-200', 'val'), transform_val)
         return trainset, testset
