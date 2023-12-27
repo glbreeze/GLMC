@@ -116,7 +116,6 @@ def main_worker(gpu, args):
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
                                              num_workers=args.workers, persistent_workers=True, pin_memory=True)
 
-    cls_num_list = train_dataset.get_per_class_num()
     cls_num_list = [0] * num_classes
     for label in train_dataset.targets:
         cls_num_list[label] += 1

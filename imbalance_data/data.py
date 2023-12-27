@@ -30,11 +30,13 @@ def get_dataset(args):
         fashion_mnist = torchvision.datasets.FashionMNIST(download=True, train=True, root="data").train_data.float()
         trainset = datasets.FashionMNIST("data", download=True, train=True, transform=transform_train)
         testset = datasets.FashionMNIST("data", download=True, train=False, transform=transform_val)
+        print("load fmnist")
         return trainset, testset
 
     elif args.dataset == 'tinyi':  # image_size:64 x 64
         trainset = datasets.ImageFolder(os.path.join(data_folder, 'tiny-imagenet-200', 'train'), transform_train)
         testset = datasets.ImageFolder(os.path.join(data_folder, 'tiny-imagenet-200', 'val'), transform_val)
+        print("load Tiny ImageNet")
         return trainset, testset
 
     elif args.dataset == 'ImageNet-LT':
