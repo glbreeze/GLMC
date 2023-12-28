@@ -36,6 +36,7 @@ class Graph_Vars:
         self.nc3 = []
 
         self.lr = []
+        self.test_acc = []
 
     def load_dt(self, nc_dt, epoch, lr=None):
         self.epoch.append(epoch)

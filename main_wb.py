@@ -167,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
     parser.add_argument('--etf_cls', default=False, action='store_true')
+    parser.add_argument('--aug', default='null', help='data augmentation')  # null | pc (padded_random_crop)
     parser.add_argument('--mixup', type=int, default=-1, help='flag for using mixup, -1 means no mixup')
     parser.add_argument('--mixup_alpha', type=float, default=1.0, help='alpha parameter for mixup')
 

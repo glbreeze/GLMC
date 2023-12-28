@@ -17,6 +17,19 @@ def compute_ETF(W, device):  # W [K, 512]
     return ETF_metric.detach().cpu().numpy().item()
 
 
+def compute_W_H_relation(W, H, device):  # W:[K, 512] H:[512, K]
+    """ H is already normalized"""
+    K = W.shape[0]
+
+    # W = W - torch.mean(W, dim=0, keepdim=True)
+    WH = torch.mm(W, H.to(device))   # [K, 512] [512, K]
+    WH /= torch.norm(WH, p='fro')
+    sub = 1 / pow(K - 1, 0.5) * (torch.eye(K) - 1 / K * torch.ones((K, K))).to(device)
+
+    res = torch.norm(WH - sub, p='fro')
+    return res.detach().cpu().numpy().item()
+
+
 def analysis(model, loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -131,6 +144,9 @@ def analysis(model, loader, args):
     normalized_W = W / torch.norm(W, 'fro')
     W_M_dist = (torch.norm(normalized_W - normalized_M) ** 2).item()
 
+    # =========== NC3 (all losses are equal paper)
+    nc3 = compute_W_H_relation(W.T, M_, device)
+
     return {
         "loss": loss,
         "acc": acc,
@@ -149,7 +165,7 @@ def analysis(model, loader, args):
         "nc22_w": cos_W,
         "nc2_h": nc2_h,
         "nc2_w": nc2_w,
-        "nc3": W_M_dist,
+        "nc3": nc3,
     }
 
 

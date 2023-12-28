@@ -18,38 +18,32 @@ class TwoCropTransform:
         return [self.transform(x), self.transform(x)]
 
 
-def get_transform(dataset):
-    if dataset == "cifar10":
-        mean = (0.49139968, 0.48215827, 0.44653124)
-        std = (0.24703233, 0.24348505, 0.26158768)
+def get_transform(dataset, aug=None):
+    # cifar10/cifar100: 32x32, stl10: 96x96, fmnist: 28x28, TinyImageNet 64x64
+    if dataset == "cifar10" or dataset == "cifar100":
+        if dataset == "cifar10":
+            mean = (0.49139968, 0.48215827, 0.44653124)
+            std = (0.24703233, 0.24348505, 0.26158768)
+        elif dataset == "cifar100":
+            mean = (0.4914, 0.4822, 0.4465)
+            std = (0.2023, 0.1994, 0.2010)
+        if (aug is None) or aug == 'null':
+            transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
+        elif aug == 'pc':  # padded crop
+            transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4),
+                                                  transforms.RandomHorizontalFlip(),
+                                                  transforms.ToTensor(),
+                                                  transforms.Normalize(mean, std),])
 
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ])
+        transform_val = transforms.Compose([transforms.ToTensor(),transforms.Normalize(mean, std)])
+        return transform_train, transform_val
 
-        transform_val = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ])
-        return transform_train,transform_val
-
-    elif dataset == "cifar100":
-        mean = (0.4914, 0.4822, 0.4465)
-        std = (0.2023, 0.1994, 0.2010)
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean, std=std),
-        ])
-
-        transform_val = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean, std=std),
-        ])
+    if dataset == 'stl10':
+        normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2470, 0.2434, 0.2615])
+        transform_train = transforms.Compose([# transforms.RandomCrop(96, padding=4), # for stl10
+                                              transforms.ToTensor(),
+                                              normalize])
+        tranform_val = transforms.Compose([transforms.ToTensor(), normalize])
         return transform_train, transform_val
 
     elif dataset == "fmnist":
@@ -65,13 +59,14 @@ def get_transform(dataset):
         return transform_train, transform_val
 
     elif dataset == 'tinyi':  # image_size:64 x 64
-        transform_train = transforms.Compose([transforms.ToTensor(),
-                                              transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-                                              ])
-        tranform_val = transforms.Compose([transforms.ToTensor(),
-                                           transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-                                           ])
-        return transform_train, tranform_val
+        if aug is None or aug == 'null':
+            transform_train = transforms.Compose([transforms.ToTensor(),
+                                                  transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+                                                  ])
+            tranform_val = transforms.Compose([transforms.ToTensor(),
+                                               transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+                                               ])
+        return transform_train, transform_val
 
     elif dataset == "ImageNet-LT":
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
