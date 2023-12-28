@@ -21,8 +21,9 @@ sif_path=/scratch/lg154/cuda11.4.2-cudnn8.2.4-devel-ubuntu20.04.3.sif
 # start running
 singularity exec --nv \
 --overlay ${ext3_path}:ro \
+--overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_wb.py --dataset cifar10 -a resnet32 --imbanlance_rate 1 --beta 0.5 --lr 0.01 \
+python main_wb.py --dataset tinyi -a resnet50 --imbanlance_rate 1 --beta 0.5 --lr 0.01 \
  --epochs 200 --loss ce --resample_weighting 0 --mixup ${MIXUP} --mixup_alpha ${ALPHA} --store_name ce_mx${MIXUP}a${ALPHA}
 "

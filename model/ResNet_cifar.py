@@ -235,7 +235,7 @@ class ResNet(nn.Module):
     def __init__(self, block, num_block, num_class=100, etf_cls=False):
         super().__init__()
         self.in_channels = 64
-        self.num_class = num_class
+        self.num_classes = num_class
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
@@ -298,7 +298,10 @@ class ResNet(nn.Module):
             out_cb = self.fc_cb(feature)
             z = self.projection_head(feature)
             p = self.contrast_head(z)
-            return out, out_cb, z,p
+            return out, out_cb, z, p, feature
+        elif ret == 'of':
+            out = self.fc_cb(feature)
+            return out, feature
         else:
             out = self.fc_cb(feature)
             return out
