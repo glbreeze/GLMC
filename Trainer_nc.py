@@ -40,9 +40,9 @@ def get_scheduler(args, optimizer, n_batches):
                                       decay_epochs=args.decay_epochs,
                                       from_epoch=0, power=args.power)
     SCHEDULERS = {
-        'step': torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.max_epochs//10, gamma=args.lr_decay),
+        'step': torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.epochs//10, gamma=args.lr_decay),
         'multi_step': torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150,350], gamma=0.1),
-        'cosine': torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_batches * args.decay_epochs, eta_min=args.end_lr),
+        'ms': torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150,350], gamma=0.1),
         'poly': torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=-1)
     }
     return SCHEDULERS[args.scheduler]
