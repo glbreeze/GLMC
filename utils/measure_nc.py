@@ -158,6 +158,8 @@ def analysis(model, loader, args):
         "nc1_cls": nc1_cls,
         "w_norm": W_norms.cpu().numpy(),
         "h_norm": M_norms.cpu().numpy(),
+        "w_mnorm": np.mean(W_norms.cpu().numpy()),
+        "h_mnorm": np.mean(M_norms.cpu().numpy()),
         "w_cos": w_cos,
         "w_cos_avg": w_cos_avg,
         "h_cos": h_cos,
