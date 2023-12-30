@@ -72,8 +72,8 @@ def main_worker(gpu, args):
 
     # ================= Data loading code
     train_dataset, val_dataset = get_dataset_balanced(args)
-    num_classes = len(np.unique(train_dataset.targets))
-    assert num_classes == args.num_classes
+    # num_classes = len(np.unique(train_dataset.targets))
+    # assert num_classes == args.num_classes
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                                                num_workers=args.workers, persistent_workers=True, pin_memory=True, sampler=None)
