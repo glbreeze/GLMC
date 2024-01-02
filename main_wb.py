@@ -146,20 +146,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32',
-                        choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')
 
-    parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate',
-                        dest='lr')
+    parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
-    parser.add_argument('--wd', '--weight_decay', default=5e-3, type=float, metavar='W',
-                        help='weight decay (default: 5e-3、2e-4、1e-4)', dest='weight_decay')
-    parser.add_argument('--resample_weighting', default=0.0, type=float,
-                        help='weighted for sampling probability (q(1,k))')
+    parser.add_argument('--wd', '--weight_decay', default=5e-3, type=float, metavar='W', help='weight decay (default: 5e-3、2e-4、1e-4)', dest='weight_decay')
+
+    parser.add_argument('--resample_weighting', default=0.0, type=float, help='weighted for sampling probability (q(1,k))')
     parser.add_argument('--label_weighting', default=1.0, type=float, help='weighted for Loss')
     parser.add_argument('--contrast_weight', default=10, type=int, help='Mixture Consistency  Weights')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
