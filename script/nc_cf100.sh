@@ -11,7 +11,7 @@
 
 # job info
 LOSS=$1
-EPS=$2
+BS=$2
 SEED=$3
 
 
@@ -25,6 +25,6 @@ singularity exec --nv \
 --overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_nc.py --dataset cifar100 -a resnet50 --epochs 800 --scheduler ms --norm bn --root_model ./result1/ \
-  --loss ${LOSS} --eps ${EPS} --batch_size 64 --seed 202${SEED} --store_name ms_${LOSS}${EPS}_b64_s${SEED}
+python main_nc.py --dataset cifar100 -a resnet50 --epochs 600 --scheduler ms --norm gn --coarse \
+  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name gn_coarse_${LOSS}_b${BS}_s${SEED}
 "
