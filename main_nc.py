@@ -41,7 +41,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="NC1"+str(args.dataset),
+    wandb.init(project="NC_"+str(args.dataset),
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -77,7 +77,7 @@ def main_worker(gpu, args):
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                                                num_workers=args.workers, persistent_workers=True, pin_memory=True, sampler=None)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=64, shuffle=False,
                                              num_workers=args.workers, persistent_workers=True, pin_memory=True)
 
     start_time = time.time()

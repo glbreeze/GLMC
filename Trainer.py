@@ -197,7 +197,7 @@ class Trainer(object):
             targets = targets.to(self.device)
             if self.args.aug == 'cm' or self.args.aug == 'cutmix':
                 cutmix = v2.CutMix(num_classes=self.args.num_classes)
-                inputs, targets = cutmix(inputs, targets)
+                inputs, reweighted_targets = cutmix(inputs, targets)
 
             if self.args.mixup >= 0:
                 output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
@@ -209,7 +209,7 @@ class Trainer(object):
             train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
                              )
-            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 else targets)
+            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 or self.args.aug=='cm' or self.args.aug=='cutmix' else targets)
             losses.update(loss.item(), targets.size(0))
 
             # ==== gradient update
