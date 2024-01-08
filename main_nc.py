@@ -41,7 +41,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="NC_"+str(args.dataset),
+    wandb.init(project="NC2_"+str(args.dataset),
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default=0, type=int, help='GPU id to use.')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--root_model', type=str, default='./result/')
+    parser.add_argument('--root_model', type=str, default='./result2/')
     parser.add_argument('--store_name', type=str, default='name')
     parser.add_argument('--debug', type=int, default=10)
     args = parser.parse_args()
@@ -150,6 +150,10 @@ if __name__ == '__main__':
         args.num_classes = 8142
     elif args.dataset == 'tinyi':
         args.num_classes = 200
+    
+    if args.batch_size < 64: 
+        args.lr = args.lr*(args.batch_size/64)
+        print("has modified the learning rate to {}".format(args.lr))
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name

@@ -172,6 +172,7 @@ def analysis(model, loader, args):
         "nc2_h": nc2_h,
         "nc2_w": nc2_w,
         "nc3": nc3,
+        "nc3_1": W_M_dist,
     }
 
 
