@@ -10,17 +10,18 @@ from PIL import Image
 from torchvision import transforms
 
 
-class Cifar100Imbanlance(Dataset):
-    def __init__(self, imbanlance_rate=0.1, file_path="data/cifar-100-python/", num_cls=100, transform=None,
-                 train=True):
+class Cifar100Imbalance(Dataset):
+    def __init__(self, imbalance_rate=0.1, imbalance_type='exp', file_path="data/cifar-100-python/",
+                 num_cls=100, transform=None, train=True):
         self.transform = transform
-        assert 0.0 < imbanlance_rate <= 1, "imbanlance_rate must 0.0 < p <= 1"
+        assert 0.0 < imbalance_rate <= 1, "imbalance_rate must 0.0 < p <= 1"
         self.num_cls = num_cls
         self.file_path = file_path
-        self.imbanlance_rate = imbanlance_rate
+        self.imbalance_rate = imbalance_rate
+        self.imbalance_type = imbalance_type
 
         if train is True:
-            self.data = self.produce_imbanlance_data(self.imbanlance_rate)
+            self.data = self.produce_imbalance_data(self.imbalance_rate)
         else:
             self.data = self.produce_test_data()
         self.x = self.data['x']
@@ -49,10 +50,24 @@ class Cifar100Imbanlance(Dataset):
             "x": x_test,
             "y": y_test,
         }
-
         return dataset
 
-    def produce_imbanlance_data(self, imbanlance_rate):
+    def get_img_num_per_cls(self, img_max, imbalance_type='step', imbalance_rate=1.0):
+        img_num_per_cls = []
+        if imbalance_type == 'exp':
+            for cls_idx in range(self.num_cls):
+                num = img_max * (imbalance_rate ** (cls_idx / (self.num_cls - 1.0)))
+                img_num_per_cls.append(int(num))
+        elif imbalance_type == 'step':
+            for cls_idx in range(self.num_cls // 2):
+                img_num_per_cls.append(int(img_max))
+            for cls_idx in range(self.num_cls // 2):
+                img_num_per_cls.append(int(img_max * imbalance_rate))
+        else:
+            img_num_per_cls.extend([int(img_max)] * self.num_cls)
+        return img_num_per_cls
+
+    def produce_imbalance_data(self, imbalance_rate):
 
         with open(os.path.join(self.file_path,"train"), 'rb') as fo:
             dict = pickle.load(fo, encoding='bytes')
@@ -63,15 +78,11 @@ class Cifar100Imbanlance(Dataset):
         data_x = None
         data_y = None
 
-        data_percent = []
         data_num = int(x_train.shape[0] / self.num_cls)
-
-        for cls_idx in range(self.num_cls):
-            num = data_num * (imbanlance_rate ** (cls_idx / (self.num_cls - 1)))
-            data_percent.append(int(num))
+        data_percent = self.get_img_num_per_cls(img_max=data_num, imbalance_type=self.imbalance_type, imbalance_rate=imbalance_rate)
 
         self.per_class_num = data_percent
-        print("imbanlance ratio is {}".format(data_percent[0] / data_percent[-1]))
+        print("imbalance ratio is {}".format(data_percent[0] / data_percent[-1]))
         print("per class num：{}".format(data_percent))
 
         for i in range(1, self.num_cls + 1):
