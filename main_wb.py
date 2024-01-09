@@ -58,7 +58,7 @@ def main(args):
     # os.environ["WANDB_CACHE_DIR"] = "/scratch/lg3490/sseg/.cache/wandb"
     # os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg3490/sseg/.config/wandb"
     wandb.login(key='1682ce21dab1a4ce453300f7dc065512c4ed0c87', relogin=True)
-    wandb.init(project=args.dataset,
+    wandb.init(project='New ' + args.dataset + ' Aug',
                name=args.store_name
                )
     wandb.config.update(args)
@@ -124,6 +124,7 @@ def main_worker(gpu, args):
     cls_num_list = np.array(cls_num_list) # number of samples per class
 
     # weighted_loader
+    # pdb.set_trace()
     cls_weight = 1.0 / (cls_num_list ** args.resample_weighting) # resample_weighting is between 0 and 1, 0 means sample balanced, 1 means class balanced
     cls_weight = cls_weight / np.sum(cls_weight) * len(cls_num_list)
     samples_weight = np.array([cls_weight[t] for t in train_dataset.targets]) # weight of each sample
@@ -187,6 +188,9 @@ if __name__ == '__main__':
     parser.add_argument('--store_name', type=str, default='name')
     parser.add_argument('--debug', type=int, default=10)
     parser.add_argument('--knn', default=False, action='store_true')
+    parser.add_argument('--aug', default='none', type=str, help='augmentation type', choices=['none', 'mixup', 'cutmix', 'cutout', 'colorjitter', 'crop'])
+    parser.add_argument('--cutoutholes', default=None, type=int)
+    parser.add_argument('--cutoutlength', default=None, type=int)
     args = parser.parse_args()
 
     if args.dataset == 'cifar10' or args.dataset == 'fmnist':
@@ -195,6 +199,9 @@ if __name__ == '__main__':
         args.num_classes = 100
     elif args.dataset == 'ImageNet-LT':
         args.num_classes = 1000
+        args.dir_train_txt = 'data/data_txt/ImageNet_LT_train.txt'
+        args.dir_test_txt = 'data/data_txt/ImageNet_LT_test.txt'
+        args.root = 'dataset/ImageNet'
     elif args.dataset == 'iNaturelist2018':
         args.num_classes = 8142
     elif args.dataset == 'tinyi':
@@ -202,7 +209,7 @@ if __name__ == '__main__':
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name
-    args.store_name = '{}_{}/{}/{}'.format(
+    args.store_name = 'aug_{}_{}/{}/{}'.format(
         args.dataset, args.arch,
         str(args.imbanlance_rate),
         file_name

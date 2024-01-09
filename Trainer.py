@@ -8,6 +8,7 @@ import datetime
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import v2
 from tensorboardX import SummaryWriter
 from sklearn.metrics import confusion_matrix
 
@@ -188,7 +189,7 @@ class Trainer(object):
         self.model.train()
         losses = AverageMeter('Loss', ':.4e')
         train_acc = AverageMeter('Train_acc', ':.4e')
-
+        # pdb.set_trace()
         if self.args.resample_weighting > 0:
             train_loader = self.weighted_train_loader
         else:
@@ -197,10 +198,16 @@ class Trainer(object):
         for i, (inputs, targets) in enumerate(train_loader):
             inputs = inputs.to(self.device) # [B, 3, 32, 32]
             targets = targets.to(self.device) # [B]
-            if self.args.mixup >= 0:
-                output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
-                                                                            mixup_alpha=self.args.mixup_alpha)
+            if self.args.aug == 'mixup':
+                if self.args.mixup >= 0:
+                    output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
+                                                                                mixup_alpha=self.args.mixup_alpha)
                 # output_cb: [B, C], reweighted_targets: [B, C], h: [B, D]
+            elif self.args.aug == 'cutmix':
+                cutmix = v2.CutMix(num_classes=self.args.num_classes, alpha=self.args.mixup_alpha)
+                inputs, reweighted_targets = cutmix(inputs, targets)
+                # output_cb, reweighted_targets, h = self.model.forward_cutmix(inputs, targets, cutmix_alpha=self.args.mixup_alpha)
+                output, output_cb, z, p, h = self.model(inputs, ret='all')
             else:
                 output, output_cb, z, p, h = self.model(inputs, ret='all')
 
@@ -208,7 +215,7 @@ class Trainer(object):
             train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
                              ) # train_acc.val to get the current loss
-            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 else targets)
+            loss = self.criterion(output_cb, reweighted_targets if (self.args.aug == "mixup" or self.args.aug == "cutmix") else targets)
             losses.update(loss.item(), targets.size(0))
 
             # ==== gradient update
@@ -321,7 +328,7 @@ class Trainer(object):
                 'best_acc1':  best_acc1,
             }, is_best, epoch + 1)
 
-        self.log.info('Best Testing Prec@1: {%.3f}\n'.format(best_acc1))
+        self.log.info('Best Testing Prec@1: {:.3f}\n'.format(best_acc1))
 
         # Store NC statistics
         filename = os.path.join(self.args.root_model, self.args.store_name, 'train_nc.pkl')

@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import torchvision
 import random
 import numpy as np
 import torch.nn.init as init
@@ -222,6 +223,25 @@ class ResNet_modify(nn.Module):
         x = self.layer3(x)
         if layer_mix == 3:
             x, target = mixup_process(x, target, lam)
+
+        feat = F.avg_pool2d(x, x.size()[3])
+        feat = feat.view(feat.size(0), -1)
+        out = self.fc_cb(feat)
+
+        return out, target, feat
+
+    def forward_cutmix(self, x, target=None, cutmix_alpha=None):
+        if cutmix_alpha is not None:
+            lam = get_lambda(cutmix_alpha)
+            lam = torch.tensor([lam], dtype=torch.float32, device=x.device)
+            lam = torch.autograd.Variable(lam) # [1]
+        
+        target = to_one_hot(target, self.num_classes) # [B, C]
+        x, target = cutmix_process(x, target, lam)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
 
         feat = F.avg_pool2d(x, x.size()[3])
         feat = feat.view(feat.size(0), -1)
