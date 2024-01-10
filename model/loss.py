@@ -27,16 +27,12 @@ class CrossEntropyLabelSmooth(nn.Module):
             targets: ground truth labels with shape (batch_size)
         """
         log_probs = self.logsoftmax(inputs)
-        if targets.ndim == 1:
-            targets = torch.zeros(log_probs.size()).scatter_(
-                1,
-                targets.unsqueeze(1).cpu(), 1)
+        targets = torch.zeros(log_probs.size()).scatter_(
+            1,
+            targets.unsqueeze(1).cpu(), 1)
 
-            if torch.cuda.is_available(): targets = targets.cuda()
-            targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
-        elif targets.ndim == 2:
-            targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
-
+        if torch.cuda.is_available(): targets = targets.cuda()
+        targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
         loss = (-targets * log_probs).sum(dim=1)
         if self.reduction:
             return loss.mean()
