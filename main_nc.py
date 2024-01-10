@@ -94,7 +94,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,stl10")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('--aug', default='null', help='data augmentation')  # null | pc (padded_random_crop)
-    parser.add_argument('--coarse', default=False, action='store_true')
 
     # model structure
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
@@ -138,10 +137,7 @@ if __name__ == '__main__':
     if args.dataset == 'cifar10' or args.dataset == 'fmnist':
         args.num_classes = 10
     elif args.dataset == 'cifar100':
-        if args.coarse:
-            args.num_classes = 20
-        else:
-            args.num_classes = 100
+        args.num_classes = 100
     elif args.dataset == 'stl10':
         args.num_classes = 10
     elif args.dataset == 'ImageNet-LT':

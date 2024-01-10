@@ -2,7 +2,6 @@ import os
 import torchvision
 from . import cifar10Imbanlance, cifar100Imbanlance, dataset_lt_data
 from .transform import get_transform, TwoCropTransform
-from .cifar import CIFAR10, CIFAR100
 from torchvision import datasets, transforms
 
 data_folder = '/' # for greene,  '../dataset' for local
@@ -53,14 +52,14 @@ def get_dataset(args):
 def get_dataset_balanced(args):
     transform_train, transform_val = get_transform(args.dataset, args.aug)
     if args.dataset == 'cifar10':
-        trainset= CIFAR10('data', train=True, download=True, transform=transform_train, coarse=False)
-        testset = CIFAR10('data', train=False, download=True, transform=transform_val, coarse=False)
+        trainset= datasets.CIFAR10('data', train=True, download=True, transform=transform_train)
+        testset = datasets.CIFAR10('data', train=False, download=True, transform=transform_val)
         print("load cifar10")
         return trainset, testset
 
     elif args.dataset == 'cifar100':
-        trainset= CIFAR100('data', train=True, download=True, transform=transform_train, coarse=args.coarse)
-        testset = CIFAR100('data', train=False, download=True, transform=transform_val, coarse=args.coarse)
+        trainset= datasets.CIFAR100('data', train=True, download=True, transform=transform_train)
+        testset = datasets.CIFAR100('data', train=False, download=True, transform=transform_val)
         print("load cifar100")
         return trainset, testset
 
