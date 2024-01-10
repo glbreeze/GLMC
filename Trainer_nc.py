@@ -60,6 +60,10 @@ class Trainer(object):
 
         self.train_loader = train_loader
         self.val_loader = val_loader
+        if args.imbalance_type == 'step' or args.imbalance_type == 'exp': 
+            self.cls_num_list = np.array(train_loader.dataset.per_class_num)
+        else: 
+            self.cls_num_list = np.array([500]*args.num_classes)
 
         self.num_classes = args.num_classes
         self.model = model
@@ -127,9 +131,11 @@ class Trainer(object):
                       step=epoch + 1)
 
             # ===== evaluate on validation set
-            acc1, acc5 = self.validate(epoch=epoch)
+            acc1, acc5, cls_acc, many_acc, few_acc = self.validate(epoch=epoch)
             wandb.log({'val/val_acc1': acc1,
-                       'val/val_acc5': acc5},
+                       'val/val_acc5': acc5, 
+                       'val/many_acc':many_acc, 
+                       'val/few_acc':few_acc},
                       step=epoch + 1)
 
             # ===== measure NC
@@ -174,7 +180,7 @@ class Trainer(object):
             pickle.dump(train_nc, f)
         self.log.info('-- Has saved Train NC analysis result to {}'.format(filename))
 
-    def validate(self, epoch=None):
+    def validate(self, epoch=None, ret_fine=False):
         batch_time = AverageMeter('Time', ':6.3f')
         top1 = AverageMeter('Acc@1', ':6.2f')
         top5 = AverageMeter('Acc@5', ':6.2f')
@@ -209,8 +215,10 @@ class Trainer(object):
             self.log.info('---->EPOCH_{epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=top1, top5=top5))
             # out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
             # self.log.info(out_cls_acc)
-
-        return top1.avg, top5.avg
+        
+        cls_acc, many_acc, few_acc = self.calculate_acc(all_targets, all_preds) 
+        return top1.avg, top5.avg, cls_acc, many_acc, few_acc 
+        
 
     def calculate_acc(self, targets, preds):
         eps = np.finfo(np.float64).eps
@@ -219,12 +227,10 @@ class Trainer(object):
         cls_hit = np.diag(cf)
         cls_acc = cls_hit / cls_cnt
 
-        many_shot = self.cls_num_list > 100
-        medium_shot = (self.cls_num_list <= 100) & (self.cls_num_list > 20)
-        few_shot = self.cls_num_list <= 20
+        many_shot = self.cls_num_list >= np.max(self.cls_num_list)
+        few_shot  = self.cls_num_list <= np.min(self.cls_num_list)
 
         many_acc = float(sum(cls_acc[many_shot]) * 100 / (sum(many_shot) + eps))
-        medium_acc = float(sum(cls_acc[medium_shot]) * 100 / (sum(medium_shot) + eps))
-        few_acc = float(sum(cls_acc[few_shot]) * 100 / (sum(few_shot) + eps))
+        few_acc  = float(sum(cls_acc[few_shot]) * 100 / (sum(few_shot) + eps))
 
-        return cls_acc, many_acc, medium_acc, few_acc
+        return cls_acc, many_acc, few_acc

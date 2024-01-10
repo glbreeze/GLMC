@@ -148,7 +148,8 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
-    parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')
+    parser.add_argument('--imbalance_rate', default=0.01, type=float, help='imbalance factor')
+    parser.add_argument('--imbalance_type', default='null', type=str, help='imbalance type')
 
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
@@ -200,7 +201,7 @@ if __name__ == '__main__':
     file_name = args.store_name
     args.store_name = '{}_{}/{}/{}'.format(
         args.dataset, args.arch,
-        str(args.imbanlance_rate),
+        str(args.imbalance_rate),
         file_name
     )
 
