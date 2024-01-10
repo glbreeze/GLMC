@@ -149,8 +149,7 @@ class Trainer(object):
                                'nc/nc2w': nc_dict['nc2_w'],
                                'nc/nc3': nc_dict['nc3'],
                                'nc/w_norm': nc_dict['w_mnorm'],
-                               'nc/h_norm': nc_dict['h_mnorm'],
-                               'nc/nc3_1': nc_dict['nc3_1']
+                               'nc/h_norm': nc_dict['h_mnorm'] 
                                }, step=epoch + 1)
                     if (epoch + 1) % (self.args.debug * 5) == 0:
                         fig = plot_nc(nc_dict)

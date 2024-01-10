@@ -36,7 +36,6 @@ class Graph_Vars:
         self.wh_cos = []
 
         self.nc3 = []
-        self.nc3_1 = []
 
         self.lr = []
         self.test_acc = []
