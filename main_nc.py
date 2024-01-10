@@ -41,7 +41,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="NC_"+str(args.dataset),
+    wandb.init(project="NC"+str(args.dataset),
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -102,10 +102,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--lr', '--learning-rate', default=0.05, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--scheduler', type=str, default='ms')
-    parser.add_argument('--lr_decay', type=float, default=0.5)
-    parser.add_argument('--end_lr', type=float, default=0.00001)  # poly LRD
-    parser.add_argument('--power', type=float, default=2.0)       # poly LRD
-    parser.add_argument('--decay_epochs', type=int, default=400)
 
     parser.add_argument('--epochs', default=800, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
