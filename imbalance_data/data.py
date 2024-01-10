@@ -10,19 +10,19 @@ data_folder = '/' # for greene,  '../dataset' for local
 def get_dataset(args):
     transform_train, transform_val = get_transform(args.dataset, args.aug)
     if args.dataset == 'cifar10':
-        trainset = cifar10Imbanlance.Cifar10Imbalance(imbalance_rate=args.imbalance_rate, imbalance_type=args.imbalance_type,
-                                                       train=True, transform=transform_train, file_path=args.root)
-        testset = cifar10Imbanlance.Cifar10Imbalance(imbalance_rate=args.imbalance_rate, imbalance_type=args.imbalance_type,
-                                                      train=False, transform=transform_val, file_path=args.root)
+        trainset = cifar10Imbanlance.Cifar10Imbanlance(transform=transform_train, imbanlance_rate=args.imbanlance_rate,
+                                                       train=True, file_path=args.root)
+        testset = cifar10Imbanlance.Cifar10Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
+                                                      transform=transform_val, file_path=args.root)
         print("load cifar10")
         return trainset, testset
 
     elif args.dataset == 'cifar100':
-        trainset = cifar100Imbanlance.Cifar100Imbalance(imbalance_rate=args.imbalance_rate, imbalance_type=args.imbalance_type,
-                                                         train=True, transform=transform_train,
+        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=transform_train,
+                                                         imbanlance_rate=args.imbanlance_rate, train=True,
                                                          file_path=os.path.join(args.root, 'cifar-100-python/'))
-        testset = cifar100Imbanlance.Cifar100Imbalance(imbalance_rate=args.imbalance_rate, imbalance_type=args.imbalance_type,
-                                                        train=False, transform=transform_val,
+        testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
+                                                        transform=transform_val,
                                                         file_path=os.path.join(args.root, 'cifar-100-python/'))
         print("load cifar100")
         return trainset, testset
