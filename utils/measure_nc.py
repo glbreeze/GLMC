@@ -104,7 +104,11 @@ def analysis(model, loader, args):
     nc1_cls = np.array(nc1_cls)
 
     # ========== NC2.1 and NC2.2
-    W = model.fc_cb.weight.detach().T  # [512, C]
+    has_fc_cb = any(name == "fc_cb" for name, _ in model.named_modules())
+    if has_fc_cb:
+        W = model.fc_cb.weight.detach().T  # [512, C]
+    else: 
+        W = model.classifier.weight.detach().T
     M_norms = torch.norm(M_, dim=0)  # [C]
     W_norms = torch.norm(W , dim=0)  # [C]
 
@@ -154,6 +158,8 @@ def analysis(model, loader, args):
         "nc1_cls": nc1_cls,
         "w_norm": W_norms.cpu().numpy(),
         "h_norm": M_norms.cpu().numpy(),
+        "w_mnorm": np.mean(W_norms.cpu().numpy()),
+        "h_mnorm": np.mean(M_norms.cpu().numpy()),
         "w_cos": w_cos,
         "w_cos_avg": w_cos_avg,
         "h_cos": h_cos,
@@ -166,6 +172,7 @@ def analysis(model, loader, args):
         "nc2_h": nc2_h,
         "nc2_w": nc2_w,
         "nc3": nc3,
+        "nc3_1": W_M_dist,
     }
 
 

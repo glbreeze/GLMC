@@ -41,7 +41,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="NC"+str(args.dataset),
+    wandb.init(project="NC3_"+str(args.dataset),
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -72,8 +72,6 @@ def main_worker(gpu, args):
 
     # ================= Data loading code
     train_dataset, val_dataset = get_dataset_balanced(args)
-    num_classes = len(np.unique(train_dataset.targets))
-    assert num_classes == args.num_classes
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                                                num_workers=args.workers, persistent_workers=True, pin_memory=True, sampler=None)
@@ -102,6 +100,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--lr', '--learning-rate', default=0.05, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--scheduler', type=str, default='ms')
+    parser.add_argument('--lr_decay', type=float, default=0.5)
+    parser.add_argument('--end_lr', type=float, default=0.00001)  # poly LRD
+    parser.add_argument('--power', type=float, default=2.0)       # poly LRD
+    parser.add_argument('--decay_epochs', type=int, default=400)
 
     parser.add_argument('--epochs', default=800, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
@@ -125,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default=0, type=int, help='GPU id to use.')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--root_model', type=str, default='./result/')
+    parser.add_argument('--root_model', type=str, default='./result3/')
     parser.add_argument('--store_name', type=str, default='name')
     parser.add_argument('--debug', type=int, default=10)
     args = parser.parse_args()
@@ -134,6 +136,8 @@ if __name__ == '__main__':
         args.num_classes = 10
     elif args.dataset == 'cifar100':
         args.num_classes = 100
+    elif args.dataset == 'stl10':
+        args.num_classes = 10
     elif args.dataset == 'ImageNet-LT':
         args.num_classes = 1000
     elif args.dataset == 'iNaturelist2018':
