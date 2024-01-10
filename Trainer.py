@@ -17,6 +17,17 @@ from utils.measure_nc import analysis
 from model.KNN_classifier import KNNClassifier
 from model.loss import CrossEntropyLabelSmooth, CDTLoss, LDTLoss
 
+
+def soften_target(targets, num_classes, epsilon):
+    targets = torch.zeros(targets.size(0), num_classes).scatter_(
+        1,
+        targets.unsqueeze(1).cpu(), 1)
+
+    if torch.cuda.is_available(): targets = targets.cuda()
+    targets = (1 - epsilon) * targets + epsilon / num_classes
+    return targets
+
+
 class Trainer(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
         self.args = args
