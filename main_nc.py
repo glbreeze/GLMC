@@ -95,11 +95,11 @@ if __name__ == '__main__':
     # train set
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,stl10")
-    parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
+    parser.add_argument('--root', type=str, default='data', help="dataset setting")
     parser.add_argument('--aug', default='null', help='data augmentation')  # null | pc (padded_random_crop)
     parser.add_argument('--coarse', default=False, action='store_true')
-    parser.add_argument('--imbalance_rate', type=float, default=1.0)
-    parser.add_argument('--imbalance_type', type=str, default='null')  # null | step | exp
+    parser.add_argument('--imbalance_rate', default=1.0)
+    parser.add_argument('--imbalance_type', default='null')  # null | step | exp
 
     # model structure
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))

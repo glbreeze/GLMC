@@ -30,7 +30,7 @@ class Cifar10Imbalance(Dataset):
         return x, y
 
     def get_per_class_num(self):
-        return self.per_class_num
+        return self.class_list
 
     def get_img_num_per_cls(self, img_max, imbalance_type='step', imbalance_rate=1.0):
         img_num_per_cls = []
@@ -60,7 +60,7 @@ class Cifar10Imbalance(Dataset):
         else:
             data_percent = [int(data_num)] * self.num_cls
 
-        self.per_class_num = data_percent
+        self.class_list = data_percent
         if train:
             print("imbalance_ration is {}".format(data_percent[0] / data_percent[-1]))
             print("per class num: {}".format(data_percent))
