@@ -26,5 +26,5 @@ singularity exec --nv \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
 python main_nc.py --dataset stl10 -a resnet50 --epochs 800 --scheduler ms --norm bn\
-  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name ms_${LOSS}_b${BS}_s${SEED}
+  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name ms_${LOSS}_b64_s${SEED}
 "

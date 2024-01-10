@@ -41,7 +41,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project="NC1"+str(args.dataset),
+    wandb.init(project="NC_"+str(args.dataset),
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -138,8 +138,6 @@ if __name__ == '__main__':
         args.num_classes = 10
     elif args.dataset == 'cifar100':
         args.num_classes = 100
-    elif args.dataset == 'stl10':
-        args.num_classes = 10
     elif args.dataset == 'ImageNet-LT':
         args.num_classes = 1000
     elif args.dataset == 'iNaturelist2018':

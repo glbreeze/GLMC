@@ -147,10 +147,8 @@ class Trainer(object):
                                'nc/nc1': nc_dict['nc1'],
                                'nc/nc2h': nc_dict['nc2_h'],
                                'nc/nc2w': nc_dict['nc2_w'],
-                               'nc/nc3': nc_dict['nc3'],
-                               'nc/w_norm': nc_dict['w_mnorm'],
-                               'nc/h_norm': nc_dict['h_mnorm'] 
-                               }, step=epoch + 1)
+                               'nc/nc3': nc_dict['nc3']},
+                              step=epoch + 1)
                     if (epoch + 1) % (self.args.debug * 5) == 0:
                         fig = plot_nc(nc_dict)
                         wandb.log({"chart": fig}, step=epoch + 1)
