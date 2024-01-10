@@ -27,8 +27,6 @@ class Graph_Vars:
         self.nc1_cls = []
         self.w_norm = []
         self.h_norm = []
-        self.w_mnorm = []
-        self.h_mnorm = []
         self.w_cos = []
         self.w_cos_avg = []
         self.h_cos = []

@@ -18,33 +18,6 @@ class TwoCropTransform:
         return [self.transform(x), self.transform(x)]
 
 
-# Define Cutout transform
-class Cutout:
-    def __init__(self, n_holes, length):
-        self.n_holes = n_holes
-        self.length = length
-
-    def __call__(self, img):
-        img = np.array(img)
-
-        h, w, _ = img.shape
-        mask = np.ones((h, w), np.float32)
-
-        for _ in range(self.n_holes):
-            y = np.random.randint(h)
-            x = np.random.randint(w)
-
-            y1 = np.clip(y - self.length // 2, 0, h)
-            y2 = np.clip(y + self.length // 2, 0, h)
-            x1 = np.clip(x - self.length // 2, 0, w)
-            x2 = np.clip(x + self.length // 2, 0, w)
-
-            mask[y1:y2, x1:x2] = 0.0
-
-        img = img * np.expand_dims(mask, axis=2)
-        return Image.fromarray(np.uint8(img))
-
-
 def get_transform(dataset, aug=None):
     # cifar10/cifar100: 32x32, stl10: 96x96, fmnist: 28x28, TinyImageNet 64x64
     if dataset == "cifar10" or dataset == "cifar100":
@@ -57,30 +30,10 @@ def get_transform(dataset, aug=None):
         if (aug is None) or aug == 'null':
             transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
         elif aug == 'pc':  # padded crop
-            transform_train = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomCrop(32, padding=4),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),])
-        elif aug == 'rs':  # resized crop
-            transform_train = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomResizedCrop(32, scale=(0.8, 1.0), ratio=(0.8, 1.2)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std), ])
-        elif aug == 'cj':  # color jittering
-            transform_train = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std), ])
-        elif aug == 'co': # cutout
-            transform_train = transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                Cutout(n_holes=1, length=16),  # Adjust parameters as needed
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std), ])
-
+            transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4),
+                                                  transforms.RandomHorizontalFlip(),
+                                                  transforms.ToTensor(),
+                                                  transforms.Normalize(mean, std),])
 
         transform_val = transforms.Compose([transforms.ToTensor(),transforms.Normalize(mean, std)])
         return transform_train, transform_val

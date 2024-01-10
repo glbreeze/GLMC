@@ -65,7 +65,7 @@ def get_dataset_balanced(args):
 
     elif args.dataset == 'stl10':
         trainset= datasets.STL10('data', split='train', download=True, transform=transform_train)
-        testset = datasets.STL10('data', split='test', download=True, transform=transform_val)
+        testset = datasets.STL10('data', split='test', download=True, transform=transform_val),
         print("load stl10")
         return trainset, testset
 
