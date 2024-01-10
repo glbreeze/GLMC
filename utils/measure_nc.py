@@ -108,7 +108,7 @@ def analysis(model, loader, args):
     if has_fc_cb:
         W = model.fc_cb.weight.detach().T  # [512, C]
     else: 
-        W = model.classifier.weight.detach().T
+        W = model.fc.weight.detach().T
     M_norms = torch.norm(M_, dim=0)  # [C]
     W_norms = torch.norm(W , dim=0)  # [C]
 

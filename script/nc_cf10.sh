@@ -25,6 +25,6 @@ singularity exec --nv \
 --overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_nc.py --dataset cifar10 -a resnet18 --epochs 800 --scheduler ms --norm gn \
-  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name gn_${LOSS}_b${BS}_s${SEED}
+python main_nc.py --dataset cifar10 -a resnet18 --epochs 800 --scheduler ms \
+  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name ms_${LOSS}_b${BS}_s${SEED}
 "

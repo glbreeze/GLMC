@@ -43,7 +43,7 @@ def get_transform(dataset, aug=None):
         transform_train = transforms.Compose([# transforms.RandomCrop(96, padding=4), # for stl10
                                               transforms.ToTensor(),
                                               normalize])
-        transform_val = transforms.Compose([transforms.ToTensor(), normalize])
+        tranform_val = transforms.Compose([transforms.ToTensor(), normalize])
         return transform_train, transform_val
 
     elif dataset == "fmnist":
