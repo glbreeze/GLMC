@@ -9,18 +9,18 @@ data_folder = '/' # for greene,  '../dataset' for local
 def get_dataset(args):
     transform_train, transform_val = get_transform(args.dataset, args.aug)
     if args.dataset == 'cifar10':
-        trainset = cifar10Imbanlance.Cifar10Imbanlance(transform=transform_train, imbanlance_rate=args.imbanlance_rate,
+        trainset = cifar10Imbanlance.Cifar10Imbanlance(transform=transform_train, imbalance_rate=args.imbalance_rate,
                                                        train=True, file_path=args.root)
-        testset = cifar10Imbanlance.Cifar10Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
+        testset = cifar10Imbanlance.Cifar10Imbanlance(imbalance_rate=args.imbalance_rate, train=False,
                                                       transform=transform_val, file_path=args.root)
         print("load cifar10")
         return trainset, testset
 
     elif args.dataset == 'cifar100':
         trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=transform_train,
-                                                         imbanlance_rate=args.imbanlance_rate, train=True,
+                                                         imbalance_rate=args.imbalance_rate, train=True,
                                                          file_path=os.path.join(args.root, 'cifar-100-python/'))
-        testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
+        testset = cifar100Imbanlance.Cifar100Imbanlance(imbalance_rate=args.imbalance_rate, train=False,
                                                         transform=transform_val,
                                                         file_path=os.path.join(args.root, 'cifar-100-python/'))
         print("load cifar100")

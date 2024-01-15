@@ -5,15 +5,15 @@ import numpy as np
 from PIL import Image
 
 class Cifar10Imbanlance(Dataset):
-    def __init__(self, imbanlance_rate, num_cls=10, file_path="data/",
+    def __init__(self, imbalance_rate, num_cls=10, file_path="data/",
                  train=True, transform=None, label_align=True, ):
         self.transform = transform
         self.label_align = label_align
-        assert 0.0 < imbanlance_rate <= 1, "imbanlance_rate must 0.0 < imbanlance_rate <= 1"
-        self.imbanlance_rate = imbanlance_rate
+        assert 0.0 < imbalance_rate <= 1, "imbanlance_rate must 0.0 < imbanlance_rate <= 1"
+        self.imbalance_rate = imbalance_rate
 
         self.num_cls = num_cls
-        self.data = self.produce_imbanlance_data(file_path=file_path, train=train,imbanlance_rate=self.imbanlance_rate)
+        self.data = self.produce_imbalance_data(file_path=file_path, train=train,imbalance_rate=self.imbalance_rate)
         self.x = self.data['x']
         self.targets = self.data['y'].tolist()
         self.y = self.data['y'].tolist()
@@ -31,7 +31,7 @@ class Cifar10Imbanlance(Dataset):
     def get_per_class_num(self):
         return self.class_list
 
-    def produce_imbanlance_data(self, imbanlance_rate, file_path="/data", train=True):
+    def produce_imbalance_data(self, imbalance_rate, file_path="/data", train=True):
 
         train_data = torchvision.datasets.CIFAR10(
             root=file_path,
@@ -47,14 +47,14 @@ class Cifar10Imbanlance(Dataset):
 
         for cls_idx in range(self.num_cls):
             if train:
-                num = data_num * (imbanlance_rate ** (cls_idx / (self.num_cls - 1)))
+                num = data_num * (imbalance_rate ** (cls_idx / (self.num_cls - 1)))
                 data_percent.append(int(num))
             else:
                 num = data_num
                 data_percent.append(int(num))
         self.class_list = data_percent
         if train:
-            print("imbanlance_ration is {}".format(data_percent[0] / data_percent[-1]))
+            print("imbalance_ration is {}".format(data_percent[0] / data_percent[-1]))
             print("per class num: {}".format(data_percent))
 
 

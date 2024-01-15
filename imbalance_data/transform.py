@@ -121,6 +121,8 @@ def get_transform(dataset, aug=None):
             std = (0.2023, 0.1994, 0.2010)
         if (aug is None) or aug == 'null':
             transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
+        elif aug == 'flip' or aug == 'cutmix' or aug=='cm':
+            transform_train = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.ToTensor(), transforms.Normalize(mean, std)])
         elif aug == 'pc':  # padded crop
             transform_train = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
@@ -142,7 +144,7 @@ def get_transform(dataset, aug=None):
         elif aug == 'co': # cutout
             transform_train = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
-                Cutout(n_holes=1, length=16),  # Adjust parameters as needed
+                Cutout(p=0.75, scale=(0.02, 0.4), ratio=(0.4, 1 / 0.4), value=(0, 255), pixel_level=False),
                 transforms.ToTensor(),
                 transforms.Normalize(mean, std), ])
 

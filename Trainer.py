@@ -8,6 +8,7 @@ import datetime
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import v2
 from tensorboardX import SummaryWriter
 from sklearn.metrics import confusion_matrix
 
@@ -196,6 +197,10 @@ class Trainer(object):
 
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
+            if self.args.aug == 'cm' or self.args.aug == 'cutmix':
+                cutmix = v2.CutMix(num_classes=self.args.num_classes)
+                inputs, reweighted_targets = cutmix(inputs, targets)
+                
             if self.args.mixup >= 0:
                 output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
                                                                             mixup_alpha=self.args.mixup_alpha)
@@ -206,7 +211,7 @@ class Trainer(object):
             train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
                              )
-            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 else targets)
+            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 or self.args.aug=='cm' or self.args.aug=='cutmix' else targets)
             losses.update(loss.item(), targets.size(0))
 
             # ==== gradient update
@@ -286,7 +291,10 @@ class Trainer(object):
                                'nc/nc1':  nc_dict['nc1'],
                                'nc/nc2h': nc_dict['nc2_h'],
                                'nc/nc2w': nc_dict['nc2_w'],
-                               'nc/nc3':  nc_dict['nc3']},
+                               'nc/nc3':  nc_dict['nc3'], 
+                               'nc/nc3_1': nc_dict['nc3_1'],
+                               'nc/w_mnorm': nc_dict['w_mnorm'], 
+                               'nc/h_mnorm': nc_dict['h_mnorm'],},
                               step=epoch+1)
                     if (epoch+1) % (self.args.debug*5) ==0:
                         fig = plot_nc(nc_dict)
