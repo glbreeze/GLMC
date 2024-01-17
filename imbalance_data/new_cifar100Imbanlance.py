@@ -17,7 +17,7 @@ class Cifar100Imbanlance(Dataset):
         std = (0.2023, 0.1994, 0.2010)
         self.transform = transform
         self.none_transform = transforms.Compose([
-                                transforms.RandomHorizontalFlip(),
+                                # transforms.RandomHorizontalFlip(),
                                 transforms.ToTensor(),
                                 transforms.Normalize(mean, std),
                             ])
@@ -40,9 +40,10 @@ class Cifar100Imbanlance(Dataset):
     def __getitem__(self, item):
         x, y = self.x[item], self.y[item]
         x = Image.fromarray(x)
+        no_aug_x = self.none_transform(x)
         if self.transform is not None:
             x = self.transform(x)
-        return x, y, self.none_transform(x)
+        return x, y, no_aug_x
 
     def get_per_class_num(self):
         return self.per_class_num

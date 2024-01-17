@@ -9,11 +9,12 @@ import torch.nn as nn
 
 from utils import util
 from utils.util import *
-from Trainer import Trainer
+# from Trainer import Trainer
+from new_Trainer import Trainer
 from model import Resnet_LT
 from model import ResNet_cifar
 from imbalance_data import cifar10Imbanlance, cifar100Imbanlance, dataset_lt_data
-from imbalance_data.data import get_dataset
+from imbalance_data.new_data import get_dataset
 import pdb
 
 best_acc1 = 0
@@ -58,7 +59,7 @@ def main(args):
     # os.environ["WANDB_CACHE_DIR"] = "/scratch/lg3490/sseg/.cache/wandb"
     # os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg3490/sseg/.config/wandb"
     wandb.login(key='1682ce21dab1a4ce453300f7dc065512c4ed0c87', relogin=True)
-    wandb.init(project='New ' + args.dataset + ' Aug',
+    wandb.init(project='Geng' + args.dataset + ' Augmentation',
                name=args.store_name
                )
     wandb.config.update(args)

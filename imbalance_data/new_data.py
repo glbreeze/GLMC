@@ -17,10 +17,10 @@ def get_dataset(args):
         return trainset, testset
 
     elif args.dataset == 'cifar100':
-        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=transform_train,
+        trainset = new_cifar100Imbanlance.Cifar100Imbanlance(transform=transform_train,
                                                          imbanlance_rate=args.imbanlance_rate, train=True,
                                                          file_path=os.path.join(args.root, 'cifar-100-python/'))
-        testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
+        testset = new_cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False,
                                                         transform=transform_val,
                                                         file_path=os.path.join(args.root, 'cifar-100-python/'))
         print("load cifar100")
