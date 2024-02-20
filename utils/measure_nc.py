@@ -53,7 +53,7 @@ def analysis(model, loader, args):
         labels = torch.cat(labels_list).to(device)
         feats = torch.cat(feats_list).to(device)
 
-    loss = torch.nn.CrossEntropyLoss(reduction='mean')(logits, target).item()
+    loss = torch.nn.CrossEntropyLoss(reduction='mean')(logits, labels).item()
     acc = (logits.argmax(dim=-1) == labels).sum().item()/len(labels)
 
     # ====== compute mean and var for each class
@@ -62,7 +62,7 @@ def analysis(model, loader, args):
         h_c = feats[idxs, :]  # [B, 512]
 
         N[c] = h_c.shape[0]
-        mean[c] = torch.sum(h_c, dim=0)/h_c.shape  #  CHW
+        mean[c] = torch.sum(h_c, dim=0)/h_c.shape[0]  #  CHW
 
         # update within-class cov
         z = h_c - mean[c].unsqueeze(0)  # [B, 512]
@@ -115,7 +115,7 @@ def analysis(model, loader, args):
     # angle between W
     W_nomarlized = W / W_norms  # [512, C]
     w_cos = (W_nomarlized.T @ W_nomarlized).cpu().numpy()  # [C, D] [D, C] -> [C, C]
-    w_cos_avg = (w_cos.sum(1) - np.diag(w_cos)) / (w_cos.shape[1] - 1)
+    w_cos_avg = (w_cos.sum(1) - np.diag(w_cos)) / (w_cos.shape[1] - 1) # [C]
 
     # angle between H
     M_normalized = M_ / M_norms  # [512, C]
@@ -123,7 +123,8 @@ def analysis(model, loader, args):
     h_cos_avg = (h_cos.sum(1) - np.diag(h_cos)) / (h_cos.shape[1] - 1)
 
     # angle between W and H
-    wh_cos = torch.sum(W_nomarlized * M_normalized, dim=0).cpu().numpy()  # [C]
+    wh_cos = (W_nomarlized.T @ M_normalized).cpu().numpy()
+    wh_cos_avg = np.mean(np.diag(wh_cos))
 
     # =========== NC2
     nc2_h = compute_ETF(M_.T, device)
@@ -136,6 +137,28 @@ def analysis(model, loader, args):
 
     # =========== NC3 (all losses are equal paper)
     nc3 = compute_W_H_relation(W.T, M_, device)
+    
+    # =========== for unbalanced dataset: 
+    if args.imbalance_type == 'step': 
+        w_mnorm1 = np.mean(W_norms[:args.num_classes//2].cpu().numpy())
+        w_mnorm2 = np.mean(W_norms[args.num_classes//2:].cpu().numpy())
+        h_mnorm1 = np.mean(M_norms[:args.num_classes//2].cpu().numpy())
+        h_mnorm2 = np.mean(M_norms[args.num_classes//2:].cpu().numpy())
+        
+        w_cos1_ = w_cos[:args.num_classes//2, :args.num_classes//2]
+        w_cos1  = (w_cos1_.sum(1) - np.diag(w_cos1_)) / (w_cos1_.shape[1] - 1)
+        w_cos2_ = w_cos[args.num_classes//2:, args.num_classes//2:]
+        w_cos2  = (w_cos2_.sum(1) - np.diag(w_cos2_)) / (w_cos2_.shape[1] - 1)
+        w_cos3_ = w_cos[:args.num_classes//2, args.num_classes//2:]
+        w_cos3  = w_cos3_.sum(1) / w_cos3_.shape[1] 
+        
+        h_cos1_ = h_cos[:args.num_classes//2, :args.num_classes//2]
+        h_cos1  = (h_cos1_.sum(1) - np.diag(h_cos1_)) / (h_cos1_.shape[1] - 1)
+        h_cos2_ = h_cos[args.num_classes//2:, args.num_classes//2:]
+        h_cos2  = (h_cos2_.sum(1) - np.diag(h_cos2_)) / (h_cos2_.shape[1] - 1)
+        h_cos3_ = h_cos[:args.num_classes//2, args.num_classes//2:]
+        h_cos3  = h_cos3_.sum(1) / h_cos3_.shape[1] 
+     
 
     return {
         "loss": loss,
@@ -146,11 +169,12 @@ def analysis(model, loader, args):
         "h_norm": M_norms.cpu().numpy(),
         "w_mnorm": np.mean(W_norms.cpu().numpy()),
         "h_mnorm": np.mean(M_norms.cpu().numpy()),
-        "w_cos": w_cos,
+        "w_cos": w_cos, 
         "w_cos_avg": w_cos_avg,
         "h_cos": h_cos,
         "h_cos_avg": h_cos_avg,
         "wh_cos": wh_cos, 
+        "wh_cos_avg": wh_cos_avg, 
         "nc21_h": norm_M_CoV,
         "nc21_w": norm_W_CoV,
         "nc22_h": cos_M,
@@ -159,6 +183,16 @@ def analysis(model, loader, args):
         "nc2_w": nc2_w,
         "nc3": nc3,
         "nc3_d": W_M_dist,
+        "w_mnorm1": w_mnorm1 if args.imbalance_type == 'step' else 0, 
+        "w_mnorm2": w_mnorm2 if args.imbalance_type == 'step' else 0, 
+        "h_mnorm1": h_mnorm1 if args.imbalance_type == 'step' else 0, 
+        "h_mnorm2": h_mnorm2 if args.imbalance_type == 'step' else 0,
+        "w_cos1": np.mean(w_cos1) if args.imbalance_type == 'step' else 0,
+        "w_cos2": np.mean(w_cos2) if args.imbalance_type == 'step' else 0,
+        "w_cos3": np.mean(w_cos3) if args.imbalance_type == 'step' else 0,
+        "h_cos1": np.mean(h_cos1) if args.imbalance_type == 'step' else 0,
+        "h_cos2": np.mean(h_cos2) if args.imbalance_type == 'step' else 0,
+        "h_cos3": np.mean(h_cos3) if args.imbalance_type == 'step' else 0,
     }
 
 

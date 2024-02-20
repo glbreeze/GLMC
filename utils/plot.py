@@ -15,7 +15,7 @@ def plot_nc(nc_dt):
     for key in k_lst:
         cos_matrix = nc_dt[key]  # [K, K]
 
-        if key in ['w_cos', 'h_cos']:
+        if key in ['w_cos', 'h_cos', 'wh_cos']:
             im = axes[int(k//2), int(k %2)].imshow(cos_matrix, cmap='RdBu')
             plt.colorbar(im, ax=axes[int(k//2), int(k %2)])
             im.set_clim(vmin=-1, vmax=1)

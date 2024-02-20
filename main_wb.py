@@ -57,7 +57,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project=args.dataset,
+    wandb.init(project='lg_'+args.dataset,
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -196,6 +196,8 @@ if __name__ == '__main__':
         args.num_classes = 8142
     elif args.dataset == 'tinyi':
         args.num_classes = 200
+    if args.imbalance_rate < 1.0: 
+        args.knn = True 
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name

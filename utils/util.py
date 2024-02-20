@@ -36,8 +36,21 @@ class Graph_Vars:
         self.wh_cos = []
 
         self.nc3 = []
-        self.nc3_1 = []
-
+        self.nc3_d = []
+        
+        self.w_mnorm1 = []
+        self.w_mnorm2 = []
+        self.w_mnorm3 = []
+        self.h_mnorm1 = []
+        self.h_mnorm2 = []
+        self.h_mnorm3 = []
+        self.w_cos1 = []
+        self.w_cos2 = []
+        self.w_cos3 = []
+        self.h_cos1 = []
+        self.h_cos2 = []
+        self.h_cos3 = []
+  
         self.lr = []
         self.test_acc = []
 

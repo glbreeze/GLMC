@@ -302,6 +302,20 @@ class Trainer(object):
                                'nc/nc2w': nc_dict['nc2_w'],
                                'nc/nc3':  nc_dict['nc3']},
                               step=epoch+1)
+                    if self.args.imbalance_type == 'step': 
+                        wandb.log({ 'nc/w_mnorm': nc_dict['w_mnorm'],
+                                    'nc/h_mnorm': nc_dict['h_mnorm'],
+                                    'nc/w_mnorm1': nc_dict['w_mnorm1'],
+                                    'nc/w_mnorm2': nc_dict['w_mnorm2'],
+                                    'nc/h_mnorm1': nc_dict['h_mnorm1'],
+                                    'nc/h_mnorm2': nc_dict['h_mnorm2'],
+                                    'nc/w_cos1':  nc_dict['w_cos1'],
+                                    'nc/w_cos2':  nc_dict['w_cos2'],
+                                    'nc/w_cos3':  nc_dict['w_cos3'],
+                                    'nc/h_cos1':  nc_dict['h_cos1'],
+                                    'nc/h_cos2':  nc_dict['h_cos2'],
+                                    'nc/h_cos3':  nc_dict['h_cos3']},
+                              step=epoch+1)
                     if (epoch+1) % (self.args.debug*5) ==0:
                         fig = plot_nc(nc_dict)
                         wandb.log({"chart": fig}, step=epoch+1)
@@ -312,10 +326,10 @@ class Trainer(object):
                         self.log.info('-- Has saved the NC analysis result/epoch{} to {}'.format(epoch+1, filename))
 
             # evaluate on validation set
-            if self.args.knn:
-                acc1 = self.validate_knn(epoch=epoch)
-            else:
-                acc1 = self.validate(epoch=epoch)
+            acc1 = self.validate(epoch=epoch)
+            if self.args.knn and self.args.imbalance_type == 'step': 
+                knn_acc1 = self.validate_knn(epoch=epoch)
+                
             if self.args.dataset == 'ImageNet-LT' or self.args.dataset == 'iNaturelist2018':
                 self.paco_adjust_learning_rate(self.optimizer, epoch, self.args)
             else:
@@ -443,11 +457,11 @@ class Trainer(object):
             # out_cls_acc = '%s Class Accuracy: %s' % ('val', (np.array2string(cls_acc, separator=',', formatter={'float_kind': lambda x: "%.3f" % x})))
             # self.log.info(out_cls_acc)
 
-            wandb.log({'val/val_acc1': top1.avg,
-                       'val/val_acc5': top5.avg,
-                       'val/val_many': many_acc,
-                       'val/val_medium': medium_acc,
-                       'val/val_few': few_acc},
+            wandb.log({'knn_val/val_acc1': top1.avg,
+                       'knn_val/val_acc5': top5.avg,
+                       'knn_val/val_many': many_acc,
+                       'knn_val/val_medium': medium_acc,
+                       'knn_val/val_few': few_acc},
                       step=epoch + 1)
 
         return top1.avg

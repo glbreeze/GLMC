@@ -10,8 +10,7 @@
 #SBATCH --partition=a100_1,a100_2,v100,rtx8000
 
 # job info
-MIXUP=$1
-ALPHA=$2
+AUG=$1
 
 
 # Singularity path
@@ -24,6 +23,6 @@ singularity exec --nv \
 --overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_wb.py --dataset tinyi -a resnet50 --imbanlance_rate 1 --beta 0.5 --lr 0.01 \
- --epochs 200 --loss ce --resample_weighting 0 --mixup ${MIXUP} --mixup_alpha ${ALPHA} --store_name ce_mx${MIXUP}a${ALPHA}
+python main_wb.py --dataset cifar10 -a resnet32 --imbalance_rate 0.01 --imbalance_type step --beta 0.5 --lr 0.01 --seed 2021\
+ --epochs 200 --loss ce --aug ${AUG} --mixup -1 --mixup_alpha 1 --store_name ce_${AUG}
 "
