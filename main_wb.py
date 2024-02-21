@@ -30,7 +30,7 @@ def get_model(args):
         elif args.arch == 'resnet18':
             net = ResNet_cifar.resnet18(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet32':
-            net = ResNet_cifar.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_cifar.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls, fnorm=args.fnorm)
         elif args.arch == 'resnet34':
             net = ResNet_cifar.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
 
@@ -162,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--contrast_weight', default=10, type=int, help='Mixture Consistency  Weights')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
 
+    parser.add_argument('--fnorm', type=str, default='none')  # none|nn1|nn2
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
     parser.add_argument('--etf_cls', default=False, action='store_true')

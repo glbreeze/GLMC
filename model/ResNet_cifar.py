@@ -124,11 +124,12 @@ class BottleNeck(nn.Module):
 
 class ResNet_modify(nn.Module):
 
-    def __init__(self, block, num_blocks, num_classes=100, nf=64, etf_cls=False):
+    def __init__(self, block, num_blocks, num_classes=100, nf=64, etf_cls=False, fnorm='none'):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
         self.num_classes = num_classes
         self.etf_cls = etf_cls
+        self.fnorm = fnorm
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_planes)
@@ -136,10 +137,17 @@ class ResNet_modify(nn.Module):
         self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
         self.out_dim = 4 * nf * block.expansion
+        if fnorm == 'nn2':  # batch norm, normalize feature
+            self.bn4 = nn.BatchNorm2d(self.out_dim)
+            bias = False
+        elif fnorm == 'nn1':
+            self.bn4 = nn.BatchNorm1d(self.out_dim)
+        elif fnorm == 'none' or fnorm == 'null':
+            bias = True
 
-        self.fc = nn.Linear(self.out_dim, num_classes)
+        self.fc = nn.Linear(self.out_dim, num_classes, bias=bias)
         # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
-        self.fc_cb = nn.Linear(self.out_dim, num_classes)
+        self.fc_cb = nn.Linear(self.out_dim, num_classes, bias=bias)
 
         hidden_dim = 128
         self.contrast_head = nn.Sequential(
@@ -173,8 +181,14 @@ class ResNet_modify(nn.Module):
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
+        if self.fnorm == 'nn2':
+            out = self.bn4(out)
         out = F.avg_pool2d(out, out.size()[3])
         feature = out.view(out.size(0), -1)
+        if self.fnorm == 'nn1':
+            feature = self.bn4(feature)
+        if self.fnorm == 'nn1' or self.fnorm == 'nn2':
+            feature = F.normalize(feature, p=2, dim=-1)
 
         if ret is None:
             out = self.fc_cb(feature)
@@ -355,7 +369,7 @@ def resnet18(num_class=100, etf_cls=False):
     """
     return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, etf_cls=etf_cls)
 
-def resnet32(num_class=10, etf_cls=False):
+def resnet32(num_class=10, etf_cls=False, fnorm='none'):
     return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, etf_cls=etf_cls)
 
 def resnet34(num_class=100, etf_cls=False):
