@@ -137,11 +137,14 @@ class ResNet_modify(nn.Module):
         self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
         self.out_dim = 4 * nf * block.expansion
-        if fnorm == 'nn2':  # batch norm, normalize feature
-            self.bn4 = nn.BatchNorm2d(self.out_dim)
+        if fnorm == 'nn1':
+            self.bn4 = nn.BatchNorm1d(self.out_dim, affine=False)
             bias = False
-        elif fnorm == 'nn1':
+        elif fnorm == 'nn2':  # batch norm, normalize feature
             self.bn4 = nn.BatchNorm1d(self.out_dim)
+            self.fc5 = nn.Linear(self.out_dim, self.out_dim)
+            self.bn5 = nn.BatchNorm1d(self.out_dim, affine=False)
+            bias = False
         elif fnorm == 'none' or fnorm == 'null':
             bias = True
 
@@ -181,12 +184,15 @@ class ResNet_modify(nn.Module):
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
-        if self.fnorm == 'nn2':
-            out = self.bn4(out)
         out = F.avg_pool2d(out, out.size()[3])
         feature = out.view(out.size(0), -1)
         if self.fnorm == 'nn1':
             feature = self.bn4(feature)
+        elif self.fnorm == 'nn2':
+            feature = self.bn4(feature)
+            feature = self.fc5(feature)
+            feature = self.bn5(feature)
+            
         if self.fnorm == 'nn1' or self.fnorm == 'nn2':
             feature = F.normalize(feature, p=2, dim=-1)
 
@@ -370,7 +376,7 @@ def resnet18(num_class=100, etf_cls=False):
     return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, etf_cls=etf_cls)
 
 def resnet32(num_class=10, etf_cls=False, fnorm='none'):
-    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, etf_cls=etf_cls)
+    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, etf_cls=etf_cls, fnorm=fnorm)
 
 def resnet34(num_class=100, etf_cls=False):
     """ return a ResNet 34 object
