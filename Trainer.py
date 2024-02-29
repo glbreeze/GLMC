@@ -211,16 +211,16 @@ class Trainer(object):
                 inputs, reweighted_targets = cutmix(inputs, targets)
 
             if self.args.mixup >= 0:
-                output_cb, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
+                output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
                                                                             mixup_alpha=self.args.mixup_alpha)
             else:
-                output, output_cb, z, p, h = self.model(inputs, ret='all')
+                output, h = self.model(inputs, ret='of')
 
             # ==== update loss and acc
-            train_acc.update(torch.sum(output_cb.argmax(dim=-1) == targets).item() / targets.size(0),
+            train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
                              )
-            loss = self.criterion(output_cb, reweighted_targets if self.args.mixup >= 0 or self.args.aug=='cm' or self.args.aug=='cutmix' else targets)
+            loss = self.criterion(output, reweighted_targets if self.args.mixup >= 0 or self.args.aug=='cm' or self.args.aug=='cutmix' else targets)
             losses.update(loss.item(), targets.size(0))
 
             # ==== gradient update
@@ -233,14 +233,14 @@ class Trainer(object):
 
                 # gradient of L wrt. b
                 beta = self.per_cls_weights[targets]  # [B]
-                P = nn.Softmax(dim=-1)(output_cb.detach())  # [B, K]
+                P = nn.Softmax(dim=-1)(output.detach())  # [B, K]
                 Y = torch.eye(self.args.num_classes, device=targets.device)[targets]  # [B, K]
                 b_grad = beta.unsqueeze(1) * (P - Y)  # [B, K]
                 b_grad = torch.sum(b_grad, dim=0) / len(b_grad)
 
                 # gradient of L wrt. W
                 weighted_P_Y = (P.detach() - Y) * beta.unsqueeze(1)  # [B, K]
-                W_grad = torch.einsum('db, bk->dk', h.detach().T, weighted_P_Y) / len(output_cb)  # [D, K]
+                W_grad = torch.einsum('db, bk->dk', h.detach().T, weighted_P_Y) / len(output)  # [D, K]
                 W_grad = W_grad.T  # [K, D]
 
                 self.optimizer.zero_grad()
@@ -300,21 +300,23 @@ class Trainer(object):
                                'nc/nc1':  nc_dict['nc1'],
                                'nc/nc2h': nc_dict['nc2_h'],
                                'nc/nc2w': nc_dict['nc2_w'],
-                               'nc/nc3':  nc_dict['nc3']},
+                               'nc/nc3':  nc_dict['nc3'],
+                               'nc/nc3d': nc_dict['nc3_d'],
+                               },
                               step=epoch+1)
                     if self.args.imbalance_type == 'step': 
-                        wandb.log({ 'nc/w_mnorm': nc_dict['w_mnorm'],
-                                    'nc/h_mnorm': nc_dict['h_mnorm'],
-                                    'nc/w_mnorm1': nc_dict['w_mnorm1'],
-                                    'nc/w_mnorm2': nc_dict['w_mnorm2'],
-                                    'nc/h_mnorm1': nc_dict['h_mnorm1'],
-                                    'nc/h_mnorm2': nc_dict['h_mnorm2'],
-                                    'nc/w_cos1':  nc_dict['w_cos1'],
-                                    'nc/w_cos2':  nc_dict['w_cos2'],
-                                    'nc/w_cos3':  nc_dict['w_cos3'],
-                                    'nc/h_cos1':  nc_dict['h_cos1'],
-                                    'nc/h_cos2':  nc_dict['h_cos2'],
-                                    'nc/h_cos3':  nc_dict['h_cos3']},
+                        wandb.log({ 'nc1/w_mnorm': nc_dict['w_mnorm'],
+                                    'nc1/h_mnorm': nc_dict['h_mnorm'],
+                                    'nc1/w_mnorm1': nc_dict['w_mnorm1'],
+                                    'nc1/w_mnorm2': nc_dict['w_mnorm2'],
+                                    'nc1/h_mnorm1': nc_dict['h_mnorm1'],
+                                    'nc1/h_mnorm2': nc_dict['h_mnorm2'],
+                                    'nc1/w_cos1':  nc_dict['w_cos1'],
+                                    'nc1/w_cos2':  nc_dict['w_cos2'],
+                                    'nc1/w_cos3':  nc_dict['w_cos3'],
+                                    'nc1/h_cos1':  nc_dict['h_cos1'],
+                                    'nc1/h_cos2':  nc_dict['h_cos2'],
+                                    'nc1/h_cos3':  nc_dict['h_cos3']},
                               step=epoch+1)
                     if (epoch+1) % (self.args.debug*5) ==0:
                         fig = plot_nc(nc_dict)
@@ -407,7 +409,6 @@ class Trainer(object):
                       step=epoch+1)
 
         return top1.avg
-
 
     def validate_knn(self,epoch=None):
         batch_time = AverageMeter('Time', ':6.3f')

@@ -11,7 +11,7 @@ from utils import util
 from utils.util import *
 from Trainer import Trainer
 from model import Resnet_LT
-from model import ResNet_cifar
+from model import ResNet_new
 from imbalance_data import cifar10Imbanlance, cifar100Imbanlance, dataset_lt_data
 from imbalance_data.data import get_dataset
 
@@ -26,13 +26,15 @@ def get_model(args):
     else:
         print("=> creating model '{}'".format(args.arch))
         if args.arch == 'resnet50':
-            net = ResNet_cifar.resnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
+        if args.arch == 'iresnet50':
+            net = ResNet_new.iresnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet18':
-            net = ResNet_cifar.resnet18(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet18(num_class=args.num_classes, etf_cls=args.etf_cls)
         elif args.arch == 'resnet32':
-            net = ResNet_cifar.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls, fnorm=args.fnorm)
+            net = ResNet_new.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls, fnorm=args.fnorm)
         elif args.arch == 'resnet34':
-            net = ResNet_cifar.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
 
         if args.dataset == 'fmnist':
             net.conv1[0] = torch.nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)
