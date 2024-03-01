@@ -163,12 +163,12 @@ class BottleNeck(nn.Module):
 # ======================== modified ResNet ========================
 class ResNet_modify(nn.Module):
 
-    def __init__(self, block, num_blocks, num_classes=100, nf=64, etf_cls=False, fnorm='none'):
+    def __init__(self, block, num_blocks, num_classes=100, nf=64, args=None):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
         self.num_classes = num_classes
-        self.etf_cls = etf_cls
-        self.fnorm = fnorm
+        self.etf_cls = args.etf_cls
+        self.fnorm = args.fnorm
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_planes)
@@ -176,15 +176,15 @@ class ResNet_modify(nn.Module):
         self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
         self.out_dim = 4 * nf * block.expansion
-        if fnorm == 'nn1':
+        if self.fnorm == 'nn1':
             self.bn4 = nn.BatchNorm1d(self.out_dim, affine=False)
             bias = False
-        elif fnorm == 'nn2':  # batch norm, normalize feature
+        elif self.fnorm == 'nn2':  # batch norm, normalize feature
             self.bn4 = nn.BatchNorm1d(self.out_dim)
             self.fc5 = nn.Linear(self.out_dim, self.out_dim)
             self.bn5 = nn.BatchNorm1d(self.out_dim, affine=False)
             bias = False
-        elif fnorm == 'none' or fnorm == 'null':
+        elif self.fnorm == 'none' or fnorm == 'null':
             bias = True
 
         self.fc = nn.Linear(self.out_dim, num_classes, bias=bias)
@@ -192,7 +192,7 @@ class ResNet_modify(nn.Module):
 
         self.apply(_weights_init)
 
-        if etf_cls:
+        if self.etf_cls:
             weight = torch.sqrt(torch.tensor(num_classes / (num_classes - 1))) * (
                     torch.eye(num_classes) - (1 / num_classes) * torch.ones((num_classes, num_classes)))
             weight /= torch.sqrt((1 / num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
@@ -407,7 +407,7 @@ class SEBlock(nn.Module):
 
 
 class IResNet(nn.Module):
-    def __init__(self, block, layers, num_class=10, use_se=False):
+    def __init__(self, block, layers, num_class=10, use_se=False, args=None):
         self.inplanes = 64
         self.use_se = use_se
         super(IResNet, self).__init__()
@@ -423,8 +423,18 @@ class IResNet(nn.Module):
         self.dropout = nn.Dropout()
         self.fc5 = nn.Linear(512 * 4 * 4, 512)
         self.bn5 = nn.BatchNorm1d(512)
+        self.fnorm = args.fnorm
+        self.etf_cls = args.etf_cls
 
         self.fc = nn.Linear(512, num_class)
+        
+        if args.etf_cls:
+            weight = torch.sqrt(torch.tensor(num_class / (num_class - 1))) * (
+                    torch.eye(num_class) - (1 / num_class) * torch.ones((num_class, num_class)))
+            weight /= torch.sqrt((1 / num_class * torch.norm(weight, 'fro') ** 2))  # [K, K]
+
+            self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(num_class, 512)))  # [K, d]
+            self.fc.weight.requires_grad_(False)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -467,6 +477,8 @@ class IResNet(nn.Module):
         x = self.dropout(x)
         x = self.fc5(x)
         feature = self.bn5(x)
+        if self.fnorm == 'nn1' or self.fnorm=='nn2': 
+            feature = F.normalize(feature)
 
         if ret == 'of':
             out = self.fc(feature)
@@ -476,38 +488,38 @@ class IResNet(nn.Module):
             return out
 
 
-def resnet18(num_class=100, etf_cls=False):
+def resnet18(num_class=100, args=None):
     """ return a ResNet 18 object
     """
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, etf_cls=etf_cls)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, args=args)
 
 
-def resnet32(num_class=10, etf_cls=False, fnorm='none'):
-    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, etf_cls=etf_cls, fnorm=fnorm)
+def resnet32(num_class=10, args=None):
+    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, args=args)
 
 
-def resnet34(num_class=100, etf_cls=False):
+def resnet34(num_class=100, args=None):
     """ return a ResNet 34 object
     """
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_class=num_class, etf_cls=etf_cls)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_class=num_class, args=args)
 
 
-def resnet50(num_class=100, etf_cls=False):
+def resnet50(num_class=100, args=None):
     """ return a ResNet 50 object
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3], num_class=num_class, etf_cls=etf_cls)
+    return ResNet(BottleNeck, [3, 4, 6, 3], num_class=num_class, args=args)
 
 
-def resnet101(num_class=100, etf_cls=False):
+def resnet101(num_class=100, args=None):
     """ return a ResNet 101 object
     """
-    return ResNet(BottleNeck, [3, 4, 23, 3], num_class=num_class, etf_cls=etf_cls)
+    return ResNet(BottleNeck, [3, 4, 23, 3], num_class=num_class, args=args)
 
 
-def resnet152(num_class=100, etf_cls=False):
+def resnet152(num_class=100, args=None):
     """ return a ResNet 152 object
     """
-    return ResNet(BottleNeck, [3, 8, 36, 3], num_class=num_class, etf_cls=etf_cls)
+    return ResNet(BottleNeck, [3, 8, 36, 3], num_class=num_class, args=args)
 
-def iresnet50(num_class=10, etf_cls=False, use_se=True, **kwargs):
-    return IResNet(IRBlock, [3, 4, 14, 3], use_se=False, **kwargs)
+def iresnet50(num_class=10, etf_cls=False, use_se=True, args=None, **kwargs):
+    return IResNet(IRBlock, [3, 4, 14, 3], num_class=num_class, use_se=False, args=args, **kwargs)

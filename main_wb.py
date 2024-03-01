@@ -26,15 +26,15 @@ def get_model(args):
     else:
         print("=> creating model '{}'".format(args.arch))
         if args.arch == 'resnet50':
-            net = ResNet_new.resnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet50(num_class=args.num_classes, args=args)
         if args.arch == 'iresnet50':
-            net = ResNet_new.iresnet50(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.iresnet50(num_class=args.num_classes, args=args)
         elif args.arch == 'resnet18':
-            net = ResNet_new.resnet18(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet18(num_class=args.num_classes, args=args)
         elif args.arch == 'resnet32':
-            net = ResNet_new.resnet32(num_class=args.num_classes, etf_cls=args.etf_cls, fnorm=args.fnorm)
+            net = ResNet_new.resnet32(num_class=args.num_classes, args=args)
         elif args.arch == 'resnet34':
-            net = ResNet_new.resnet34(num_class=args.num_classes, etf_cls=args.etf_cls)
+            net = ResNet_new.resnet34(num_class=args.num_classes, args=args)
 
         if args.dataset == 'fmnist':
             net.conv1[0] = torch.nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -148,9 +148,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32') # , choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
-    parser.add_argument('--imbalance_rate', default=0.01, type=float, help='imbalance factor')
+    parser.add_argument('--imbalance_rate', default=1.0, type=float, help='imbalance factor')
     parser.add_argument('--imbalance_type', default='null', type=str, help='imbalance type')
 
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate', dest='lr')

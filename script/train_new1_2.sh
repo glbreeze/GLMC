@@ -26,5 +26,5 @@ singularity exec --nv \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
 python main_wb.py --dataset cifar100 -a ${ARCH} --imbalance_rate ${IB} --imbalance_type step --beta 0.5 --lr 0.01 --seed 2021 \
- --epochs 200 --loss ce --fnorm ${FNORM} --resample_weighting 0 --mixup -1 --mixup_alpha 1 --store_name ${ARCH}_ce_ib${IB}_${FNORM}
+ --epochs 200 --loss ce --fnorm ${FNORM} --resample_weighting 0 --mixup -1 --mixup_alpha 1 --etf_cls --store_name ${ARCH}_etf_ib${IB}_${FNORM}
  " 
