@@ -241,7 +241,7 @@ class Trainer(object):
             acc1, acc5 = accuracy(all_logits, all_targets, topk=(1, 5))
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets.cpu().numpy(), all_preds.cpu().numpy())
             self.log.info(
-                '---->EPOCH{epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=acc1, top5=acc5))
+                '---->EPOCH{} Val: Prec@1 {:.3f} Prec@5 {:.3f}'.format(epoch, acc1, acc5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
 
             wandb.log({'val/val_acc1': acc1,
@@ -276,7 +276,7 @@ class Trainer(object):
             acc1, acc5 = accuracy(all_logits, all_targets, topk=(1, 5))
             cls_acc, many_acc, medium_acc, few_acc = self.calculate_acc(all_targets.cpu().numpy(), all_preds.cpu().numpy())
             self.log.info(
-                '---->EPOCH{epoch} Val: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'.format(epoch=epoch + 1, top1=acc1,top5=acc5))
+                '---->EPOCH{} Val: Prec@1 {:.3f} Prec@5 {:.3f}'.format(epoch, acc1, acc5))
             self.log.info("many acc {:.2f}, med acc {:.2f}, few acc {:.2f}".format(many_acc, medium_acc, few_acc))
 
             wandb.log({'knn_val/val_acc1': acc1,

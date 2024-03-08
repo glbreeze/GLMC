@@ -26,15 +26,15 @@ def get_model(args):
     else:
         print("=> creating model '{}'".format(args.arch))
         if args.arch == 'resnet50':
-            net = ResNet_new.resnet50(num_class=args.num_classes, args=args)
+            net = ResNet_new.resnet50(args=args)
         if args.arch == 'iresnet50':
-            net = ResNet_new.iresnet50(num_class=args.num_classes, args=args)
+            net = ResNet_new.iresnet50(args=args)
         elif args.arch == 'resnet18':
-            net = ResNet_new.resnet18(num_class=args.num_classes, args=args)
+            net = ResNet_new.resnet18(args=args)
         elif args.arch == 'resnet32':
-            net = ResNet_new.resnet32(num_class=args.num_classes, args=args)
+            net = ResNet_new.resnet32(args=args)
         elif args.arch == 'resnet34':
-            net = ResNet_new.resnet34(num_class=args.num_classes, args=args)
+            net = ResNet_new.resnet34(args=args)
 
         if args.dataset == 'fmnist':
             net.conv1[0] = torch.nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)

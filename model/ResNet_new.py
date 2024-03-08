@@ -328,7 +328,7 @@ class ResNet(nn.Module):
         if 'use_se' in args and args.use_se:
             layer_kwargs = {'use_se': args.use_se}
 
-        if args.arch.startwith('iresent'):
+        if args.arch.startswith('iresent'):
             self.conv1 = nn.Sequential(
                 nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(64),
@@ -346,26 +346,26 @@ class ResNet(nn.Module):
         self.conv4_x = self._make_layer(block, 256, num_block[2], 2, **layer_kwargs)
         self.conv5_x = self._make_layer(block, 512, num_block[3], 2, **layer_kwargs)
 
-        if self.fnorm == 'none' or self.fnorm == 'null':
+        if self.args.fnorm == 'none' or self.args.fnorm == 'null':
             self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.fnorm == 'b':
+        elif self.args.fnorm == 'b':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.AdaptiveAvgPool2d((1, 1))
                                          )
-        elif self.fnorm == 'bfb':
+        elif self.args.fnorm == 'bfb':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
-                                         nn.Linear(512 * block.expansion * 4 * 4, 512),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
                                          nn.BatchNorm1d(512)
             )
-        elif self.fnorm.startwith('bfb_d'):   # with_dropout
-            dropout_rate = float(self.fnorm.replace('bfb_d', ''))
+        elif self.args.fnorm.startwith('bfb_d'):   # with_dropout
+            dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
                                          nn.Dropout(dropout_rate),
-                                         nn.Linear(512 * block.expansion * 4 * 4, 512),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
                                          nn.BatchNorm1d(512)
                                          )
         if args.loss.endswith('m'):  # m for margin
@@ -374,7 +374,7 @@ class ResNet(nn.Module):
             self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=True)                   # may need to change the bias
             self.apply(_weights_init)
 
-        if self.etf_cls:
+        if self.args.etf_cls:
             weight = torch.sqrt(torch.tensor(self.num_class / (self.num_class - 1))) * (
                     torch.eye(self.num_class) - (1 / self.num_class) * torch.ones((self.num_class, self.num_class)))
             weight /= torch.sqrt((1 / self.num_class * torch.norm(weight, 'fro') ** 2))  # [K, K]
