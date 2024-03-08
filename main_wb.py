@@ -63,15 +63,11 @@ def main(args):
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
-    main_worker(args.gpu, wandb.config)
+    main_worker(wandb.config)
 
 
-def main_worker(gpu, args):
+def main_worker(args):
     global best_acc1
-
-    args.gpu = gpu
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
 
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M')
@@ -84,12 +80,8 @@ def main_worker(gpu, args):
     # ==================== create model
     model = get_model(args)
     _ = print_model_param_nums(model=model)
-    if args.gpu is not None:
-        torch.cuda.set_device(args.gpu)
-        model = model.cuda(args.gpu)
-    else:
-        # DataParallel will divide and allocate batch_size to all available GPUs
-        model = torch.nn.DataParallel(model).cuda()
+    if torch.cuda.is_available():
+        model = model.cuda()
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -98,19 +90,17 @@ def main_worker(gpu, args):
             checkpoint = torch.load(args.resume, map_location='cuda:0')
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_acc1']
-            if args.gpu is not None:
-                # best_acc1 may be from a checkpoint from a different GPU
-                best_acc1 = best_acc1.to(args.gpu)
             model.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
-    # ================= Data loading code
+    # ================= Data loading code =================
     train_dataset, val_dataset = get_dataset(args)
     num_classes = len(np.unique(train_dataset.targets))
     assert num_classes == args.num_classes
 
+    # ================= Default Loader
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                                shuffle=(train_sampler is None), num_workers=args.workers,
@@ -118,12 +108,12 @@ def main_worker(gpu, args):
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
                                              num_workers=args.workers, persistent_workers=True, pin_memory=True)
 
+    # ================= weighted_loader
     cls_num_list = [0] * num_classes
     for label in train_dataset.targets:
         cls_num_list[label] += 1
     cls_num_list = np.array(cls_num_list)
 
-    # weighted_loader
     cls_weight = 1.0 / (cls_num_list ** args.resample_weighting)
     cls_weight = cls_weight / np.sum(cls_weight) * len(cls_num_list)
     samples_weight = np.array([cls_weight[t] for t in train_dataset.targets])
@@ -166,6 +156,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--fnorm', type=str, default='none')  # none|nn1|nn2
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
+    parser.add_argument('--margins', type=str, default='1.0_0.5_0.0')
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
     parser.add_argument('--etf_cls', default=False, action='store_true')
     parser.add_argument('--aug', default='null', help='data augmentation')  # null | pc (padded_random_crop)
@@ -176,7 +167,6 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=3407, type=int, help='seed for initializing training. ')
     parser.add_argument('-p', '--print_freq', default=1000, type=int, metavar='N',
                         help='print frequency (default: 100)')
-    parser.add_argument('--gpu', default=0, type=int, help='GPU id to use.')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--resume', default=None, type=str, metavar='PATH',
@@ -200,7 +190,8 @@ if __name__ == '__main__':
     elif args.dataset == 'tinyi':
         args.num_classes = 200
     if args.imbalance_rate < 1.0: 
-        args.knn = True 
+        args.knn = True
+    args.margins = [float(a) for a in args.margins.split('_')]
 
     curr_time = datetime.datetime.now()
     file_name = args.store_name

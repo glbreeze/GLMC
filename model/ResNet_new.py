@@ -7,8 +7,20 @@ import torch.nn.functional as F
 from .utils import *
 
 
+class LinearLayer(nn.Module):
+
+    def __init__(self, in_features, out_features,):
+        super(LinearLayer, self).__init__()
+        self.weight = nn.Parameter(torch.FloatTensor(out_features, in_features))
+        nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, input):
+        # --------------------------- cos(theta) & phi(theta) ---------------------------
+        logits = F.linear(F.normalize(input), F.normalize(self.weight))   # [B, 10]
+        return logits.clamp(-1, 1)
+
+
 def _weights_init(m):
-    classname = m.__class__.__name__
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         init.kaiming_normal_(m.weight)
 
@@ -21,6 +33,29 @@ class LambdaLayer(nn.Module):
 
     def forward(self, x):
         return self.lambd(x)
+
+def conv3x3(in_planes, out_planes, stride=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=1, bias=False)
+
+
+class SEBlock(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SEBlock, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+                nn.Linear(channel, channel // reduction),
+                nn.PReLU(),
+                nn.Linear(channel // reduction, channel),
+                nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y
 
 
 class BasicBlock_s(nn.Module):
@@ -59,7 +94,7 @@ class BasicBlock_s(nn.Module):
 class IRBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, use_se=True):
+    def __init__(self, inplanes, planes, stride=1, use_se=True):
         super(IRBlock, self).__init__()
         self.bn0 = nn.BatchNorm2d(inplanes)
         self.conv1 = conv3x3(inplanes, inplanes)
@@ -67,7 +102,13 @@ class IRBlock(nn.Module):
         self.prelu = nn.PReLU()
         self.conv2 = conv3x3(inplanes, planes, stride)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.downsample = downsample
+        if stride != 1 or inplanes != planes * IRBlock.expansion:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(inplanes, planes * IRBlock.expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * IRBlock.expansion),
+            )
+        else:
+            self.downsample = None
         self.stride = stride
         self.use_se = use_se
         if self.use_se:
@@ -92,6 +133,7 @@ class IRBlock(nn.Module):
         out = self.prelu(out)
 
         return out
+
 
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
@@ -163,10 +205,10 @@ class BottleNeck(nn.Module):
 # ======================== modified ResNet ========================
 class ResNet_modify(nn.Module):
 
-    def __init__(self, block, num_blocks, num_classes=100, nf=64, args=None):
+    def __init__(self, block, num_blocks, nf=64, args=None):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
-        self.num_classes = num_classes
+        self.num_classes = args.num_classes
         self.etf_cls = args.etf_cls
         self.fnorm = args.fnorm
 
@@ -184,20 +226,20 @@ class ResNet_modify(nn.Module):
             self.fc5 = nn.Linear(self.out_dim, self.out_dim)
             self.bn5 = nn.BatchNorm1d(self.out_dim, affine=False)
             bias = False
-        elif self.fnorm == 'none' or fnorm == 'null':
+        elif self.fnorm == 'none' or self.fnorm == 'null':
             bias = True
 
-        self.fc = nn.Linear(self.out_dim, num_classes, bias=bias)
+        self.fc = nn.Linear(self.out_dim, self.num_classes, bias=bias)
         # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
 
         self.apply(_weights_init)
 
         if self.etf_cls:
-            weight = torch.sqrt(torch.tensor(num_classes / (num_classes - 1))) * (
-                    torch.eye(num_classes) - (1 / num_classes) * torch.ones((num_classes, num_classes)))
-            weight /= torch.sqrt((1 / num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
+            weight = torch.sqrt(torch.tensor(self.num_classes / (self.num_classes - 1))) * (
+                    torch.eye(self.num_classes) - (1 / self.num_classes) * torch.ones((self.num_classes, self.num_classes)))
+            weight /= torch.sqrt((1 / self.num_classes * torch.norm(weight, 'fro') ** 2))  # [K, K]
 
-            self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(num_classes, self.out_dim)))  # [K, d]
+            self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(self.num_classes, self.out_dim)))  # [K, d]
             self.fc.weight.requires_grad_(False)
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -276,29 +318,71 @@ class ResNet_modify(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, num_block, num_class=100, etf_cls=False):
+    def __init__(self, block, num_block, args=None):
         super().__init__()
         self.in_channels = 64
-        self.num_classes = num_class
+        self.num_class = args.num_classes
+        self.args = args
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True))
-        # we use a different inputsize than the original paper
-        # so conv2_x's stride is 1
+        layer_kwargs = {}
+        if 'use_se' in args and args.use_se:
+            layer_kwargs = {'use_se': args.use_se}
 
-        self.conv2_x = self._make_layer(block, 64, num_block[0], 1)
-        self.conv3_x = self._make_layer(block, 128, num_block[1], 2)
-        self.conv4_x = self._make_layer(block, 256, num_block[2], 2)
-        self.conv5_x = self._make_layer(block, 512, num_block[3], 2)
-        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        # from torch.nn import w
+        if args.arch.startwith('iresent'):
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.PReLU()
+            )
+        else:
+            self.conv1 = nn.Sequential(
+                nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True))
 
-        self.fc = nn.Linear(512 * block.expansion, num_class)
-        # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
+        # we use a different input_size than the original paper so conv2_x's stride is 1
+        self.conv2_x = self._make_layer(block, 64,  num_block[0], 1, **layer_kwargs)
+        self.conv3_x = self._make_layer(block, 128, num_block[1], 2, **layer_kwargs)
+        self.conv4_x = self._make_layer(block, 256, num_block[2], 2, **layer_kwargs)
+        self.conv5_x = self._make_layer(block, 512, num_block[3], 2, **layer_kwargs)
 
-    def _make_layer(self, block, out_channels, num_blocks, stride):
+        if self.fnorm == 'none' or self.fnorm == 'null':
+            self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+                                         nn.Flatten()
+                                         )
+        elif self.fnorm == 'b':
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.AdaptiveAvgPool2d((1, 1))
+                                         )
+        elif self.fnorm == 'bfb':
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.Flatten(),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512),
+                                         nn.BatchNorm1d(512)
+            )
+        elif self.fnorm.startwith('bfb_d'):   # with_dropout
+            dropout_rate = float(self.fnorm.replace('bfb_d', ''))
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.Flatten(),
+                                         nn.Dropout(dropout_rate),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512),
+                                         nn.BatchNorm1d(512)
+                                         )
+        if args.loss.endswith('m'):  # m for margin
+            self.fc = LinearLayer(512 * block.expansion, self.num_class)
+        else:
+            self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=True)                   # may need to change the bias
+            self.apply(_weights_init)
+
+        if self.etf_cls:
+            weight = torch.sqrt(torch.tensor(self.num_class / (self.num_class - 1))) * (
+                    torch.eye(self.num_class) - (1 / self.num_class) * torch.ones((self.num_class, self.num_class)))
+            weight /= torch.sqrt((1 / self.num_class * torch.norm(weight, 'fro') ** 2))  # [K, K]
+
+            self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(self.num_class, self.out_dim)))  # [K, d]
+            self.fc.weight.requires_grad_(False)
+
+    def _make_layer(self, block, out_channels, num_blocks, stride, **kwargs):
         """make resnet layers(by layer i didnt mean this 'layer' was the
         same as a neuron netowork layer, ex. conv layer), one layer may
         contain more than one residual block
@@ -316,7 +400,7 @@ class ResNet(nn.Module):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_channels, out_channels, stride))
+            layers.append(block(self.in_channels, out_channels, stride, **kwargs))
             self.in_channels = out_channels * block.expansion
 
         return nn.Sequential(*layers)
@@ -327,13 +411,13 @@ class ResNet(nn.Module):
         output = self.conv3_x(output)
         output = self.conv4_x(output)
         output = self.conv5_x(output)
-        output = self.avg_pool(output)
-        feature = output.view(output.size(0), -1)
+
+        feat = self.feature(output)
+        out = self.fc(feat)
+
         if ret == 'of':
-            out = self.fc(feature)
-            return out, feature
+            return out, feat
         else:
-            out = self.fc(feature)
             return out
 
     def forward_mixup(self, x, target=None, mixup=None, mixup_alpha=None):
@@ -373,153 +457,46 @@ class ResNet(nn.Module):
         if layer_mix == 5:
             x, target = mixup_process(x, target, lam)
 
-        x = self.avg_pool(x)
-        feat = x.view(x.size(0), -1)
-
-        out = self.fc_cb(feat)
+        feat = self.feature(x)
+        out = self.fc(feat)
         return out, target, feat
 
 
-# ======================== new ResNet ========================
+# ======================== Define ResNet ========================
 
-def conv3x3(in_planes, out_planes, stride=1):
-    """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
-
-
-class SEBlock(nn.Module):
-    def __init__(self, channel, reduction=16):
-        super(SEBlock, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-                nn.Linear(channel, channel // reduction),
-                nn.PReLU(),
-                nn.Linear(channel // reduction, channel),
-                nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        b, c, _, _ = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        return x * y
-
-
-class IResNet(nn.Module):
-    def __init__(self, block, layers, num_class=10, use_se=False, args=None):
-        self.inplanes = 64
-        self.use_se = use_se
-        super(IResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.prelu = nn.PReLU()
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.bn4 = nn.BatchNorm2d(512)
-        self.dropout = nn.Dropout()
-        self.fc5 = nn.Linear(512 * 4 * 4, 512)
-        self.bn5 = nn.BatchNorm1d(512)
-        self.fnorm = args.fnorm
-        self.etf_cls = args.etf_cls
-
-        self.fc = nn.Linear(512, num_class)
-        
-        if args.etf_cls:
-            weight = torch.sqrt(torch.tensor(num_class / (num_class - 1))) * (
-                    torch.eye(num_class) - (1 / num_class) * torch.ones((num_class, num_class)))
-            weight /= torch.sqrt((1 / num_class * torch.norm(weight, 'fro') ** 2))  # [K, K]
-
-            self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(num_class, 512)))  # [K, d]
-            self.fc.weight.requires_grad_(False)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.xavier_normal_(m.weight)
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                nn.init.constant_(m.bias, 0)
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, use_se=self.use_se))
-        self.inplanes = planes
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, use_se=self.use_se))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x, ret='o'):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.prelu(x)
-        # x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        x = self.bn4(x)
-        x = torch.flatten(x, 1)
-        x = self.dropout(x)
-        x = self.fc5(x)
-        feature = self.bn5(x)
-        if self.fnorm == 'nn1' or self.fnorm=='nn2': 
-            feature = F.normalize(feature)
-
-        if ret == 'of':
-            out = self.fc(feature)
-            return out, feature
-        else:
-            out = self.fc(feature)
-            return out
-
-
-def resnet18(num_class=100, args=None):
+def resnet18(args=None):
     """ return a ResNet 18 object
     """
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_class=num_class, args=args)
+    return ResNet(BasicBlock, [2, 2, 2, 2], args=args)
 
 
-def resnet32(num_class=10, args=None):
-    return ResNet_modify(BasicBlock_s, [5, 5, 5], num_classes=num_class, args=args)
+def resnet32(args=None):
+    return ResNet_modify(BasicBlock_s, [5, 5, 5], args=args)
 
 
-def resnet34(num_class=100, args=None):
+def resnet34(args=None):
     """ return a ResNet 34 object
     """
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_class=num_class, args=args)
+    return ResNet(BasicBlock, [3, 4, 6, 3], args=args)
 
 
-def resnet50(num_class=100, args=None):
+def resnet50(args=None):
     """ return a ResNet 50 object
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3], num_class=num_class, args=args)
+    return ResNet(BottleNeck, [3, 4, 6, 3], args=args)
 
 
-def resnet101(num_class=100, args=None):
+def resnet101(args=None):
     """ return a ResNet 101 object
     """
-    return ResNet(BottleNeck, [3, 4, 23, 3], num_class=num_class, args=args)
+    return ResNet(BottleNeck, [3, 4, 23, 3], args=args)
 
 
-def resnet152(num_class=100, args=None):
+def resnet152(args=None):
     """ return a ResNet 152 object
     """
-    return ResNet(BottleNeck, [3, 8, 36, 3], num_class=num_class, args=args)
+    return ResNet(BottleNeck, [3, 8, 36, 3], args=args)
 
-def iresnet50(num_class=10, etf_cls=False, use_se=True, args=None, **kwargs):
-    return IResNet(IRBlock, [3, 4, 14, 3], num_class=num_class, use_se=False, args=args, **kwargs)
+
+def iresnet50(args=None):
+    return ResNet(IRBlock, [3, 4, 14, 3], args=args)
