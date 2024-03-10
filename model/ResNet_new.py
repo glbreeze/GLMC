@@ -226,7 +226,7 @@ class ResNet_modify(nn.Module):
             self.fc5 = nn.Linear(self.out_dim, self.out_dim)
             self.bn5 = nn.BatchNorm1d(self.out_dim, affine=False)
             bias = False
-        elif self.fnorm == 'none' or self.fnorm == 'null':
+        else:
             bias = True
 
         self.fc = nn.Linear(self.out_dim, self.num_classes, bias=bias)
@@ -352,13 +352,14 @@ class ResNet(nn.Module):
                                          )
         elif self.args.fnorm == 'b':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
-                                         nn.AdaptiveAvgPool2d((1, 1))
+                                         nn.AdaptiveAvgPool2d((1, 1)),
+                                         nn.Flatten()
                                          )
         elif self.args.fnorm == 'bfb':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
                                          nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
-                                         nn.BatchNorm1d(512)
+                                         nn.BatchNorm1d(512 * block.expansion)
             )
         elif self.args.fnorm.startwith('bfb_d'):   # with_dropout
             dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
@@ -366,7 +367,7 @@ class ResNet(nn.Module):
                                          nn.Flatten(),
                                          nn.Dropout(dropout_rate),
                                          nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
-                                         nn.BatchNorm1d(512)
+                                         nn.BatchNorm1d(512 * block.expansion)
                                          )
         if args.loss.endswith('m'):  # m for margin
             self.fc = LinearLayer(512 * block.expansion, self.num_class)
@@ -410,7 +411,7 @@ class ResNet(nn.Module):
         output = self.conv2_x(output)
         output = self.conv3_x(output)
         output = self.conv4_x(output)
-        output = self.conv5_x(output)
+        output = self.conv5_x(output)  # [B, C, 4, 4]
 
         feat = self.feature(output)
         out = self.fc(feat)

@@ -5,7 +5,7 @@ from .transform import get_transform, TwoCropTransform
 from .cifar import CIFAR10, CIFAR100
 from torchvision import datasets, transforms
 
-data_folder = '/' # for greene,  '../dataset' for local
+data_folder = 'data/' # for greene,  '../dataset' for local
 
 def get_dataset(args):
     transform_train, transform_val = get_transform(args.dataset, args.aug)
