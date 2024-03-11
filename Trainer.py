@@ -68,7 +68,7 @@ class Trainer(object):
             self.criterion = nn.CrossEntropyLoss(reduction='mean')
         elif self.args.loss == 'bce':
             self.criterion = nn.BCELoss(reduction='mean')
-        elif self.args.loss == 'arcf':
+        elif self.args.loss == 'arcf' or self.args.loss == 'arcm':
             self.criterion = CombinedMarginLoss(64, self.args.margins[0], self.args.margins[1], self.args.margins[2])
 
     def train_one_epoch(self):
@@ -156,7 +156,7 @@ class Trainer(object):
 
             # ============ evaluation ============
             acc1 = self.validate(epoch=epoch)
-            if self.args.knn and self.args.imbalance_type == 'step':
+            if self.args.imbalance_type == 'step' and self.args.imbalance_rate < 1.0:
                 knn_acc1 = self.validate_knn(epoch=epoch)
 
             if self.args.dataset == 'ImageNet-LT' or self.args.dataset == 'iNaturelist2018':

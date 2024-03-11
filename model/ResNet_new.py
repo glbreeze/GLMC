@@ -345,6 +345,7 @@ class ResNet(nn.Module):
         self.conv3_x = self._make_layer(block, 128, num_block[1], 2, **layer_kwargs)
         self.conv4_x = self._make_layer(block, 256, num_block[2], 2, **layer_kwargs)
         self.conv5_x = self._make_layer(block, 512, num_block[3], 2, **layer_kwargs)
+        self.out_dim = 512 * block.expansion
 
         if self.args.fnorm == 'none' or self.args.fnorm == 'null':
             self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
@@ -361,7 +362,7 @@ class ResNet(nn.Module):
                                          nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
                                          nn.BatchNorm1d(512 * block.expansion)
             )
-        elif self.args.fnorm.startwith('bfb_d'):   # with_dropout
+        elif self.args.fnorm.startswith('bfb_d'):   # with_dropout
             dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
@@ -411,9 +412,11 @@ class ResNet(nn.Module):
         output = self.conv2_x(output)
         output = self.conv3_x(output)
         output = self.conv4_x(output)
-        output = self.conv5_x(output)  # [B, C, 4, 4]
+        output = self.conv5_x(output)
 
         feat = self.feature(output)
+        if self.args.norm == 'f': 
+            feat = F.normalize(feat, p=2, dim=-1)
         out = self.fc(feat)
 
         if ret == 'of':

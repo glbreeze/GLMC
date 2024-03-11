@@ -155,6 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
 
     parser.add_argument('--fnorm', type=str, default='none')  # none|nn1|nn2
+    parser.add_argument('--norm', type=str, default='null')  # none|nn1|nn2
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
     parser.add_argument('--margins', type=str, default='1.0_0.5_0.0')
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss
