@@ -208,6 +208,7 @@ class ResNet_modify(nn.Module):
     def __init__(self, block, num_blocks, nf=64, args=None):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
+        self.args = args
         self.num_classes = args.num_classes
         self.etf_cls = args.etf_cls
         self.fnorm = args.fnorm
@@ -218,21 +219,36 @@ class ResNet_modify(nn.Module):
         self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
         self.out_dim = 4 * nf * block.expansion
-        if self.fnorm == 'nn1':
-            self.bn4 = nn.BatchNorm1d(self.out_dim, affine=False)
-            bias = False
-        elif self.fnorm == 'nn2':  # batch norm, normalize feature
-            self.bn4 = nn.BatchNorm1d(self.out_dim)
-            self.fc5 = nn.Linear(self.out_dim, self.out_dim)
-            self.bn5 = nn.BatchNorm1d(self.out_dim, affine=False)
-            bias = False
+
+        if self.args.fnorm == 'none' or self.args.fnorm == 'null':
+            self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+                                         nn.Flatten()
+                                         )
+        elif self.args.fnorm == 'b':
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.AdaptiveAvgPool2d((1, 1)),
+                                         nn.Flatten()
+                                         )
+        elif self.args.fnorm == 'bfb':
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.Flatten(),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
+                                         nn.BatchNorm1d(512 * block.expansion)
+                                         )
+        elif self.args.fnorm.startswith('bfb_d'):  # with_dropout
+            dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
+            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+                                         nn.Flatten(),
+                                         nn.Dropout(dropout_rate),
+                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
+                                         nn.BatchNorm1d(512 * block.expansion)
+                                         )
+
+        if args.loss.endswith('m'):  # m for margin
+            self.fc = LinearLayer(512 * block.expansion, self.num_class)
         else:
-            bias = True
-
-        self.fc = nn.Linear(self.out_dim, self.num_classes, bias=bias)
-        # self.fc_cb = torch.nn.utils.weight_norm(nn.Linear(512 * block.expansion, num_class), dim=0)
-
-        self.apply(_weights_init)
+            self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=True)  # may need to change the bias
+            self.apply(_weights_init)
 
         if self.etf_cls:
             weight = torch.sqrt(torch.tensor(self.num_classes / (self.num_classes - 1))) * (
@@ -256,26 +272,15 @@ class ResNet_modify(nn.Module):
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
-        out = F.avg_pool2d(out, out.size()[3])
-        feature = out.view(out.size(0), -1)
-        if self.fnorm == 'nn1':
-            feature = self.bn4(feature)
-        elif self.fnorm == 'nn2':
-            feature = self.bn4(feature)
-            feature = self.fc5(feature)
-            feature = self.bn5(feature)
 
-        if self.fnorm == 'nn1' or self.fnorm == 'nn2':
-            feature = F.normalize(feature, p=2, dim=-1)
+        feat = self.feature(out)
+        if self.args.norm == 'f':
+            feat = F.normalize(feat, p=2, dim=-1)
+        out = self.fc(feat)
 
-        if ret is None:
-            out = self.fc_cb(feature)
-            return out
-        elif ret == 'of':
-            out = self.fc(feature)
-            return out, feature
+        if ret == 'of':
+            return out, feat
         else:
-            out = self.fc(feature)
             return out
 
     def forward_mixup(self, x, target=None, mixup=None, mixup_alpha=None):
@@ -309,8 +314,7 @@ class ResNet_modify(nn.Module):
         if layer_mix == 3:
             x, target = mixup_process(x, target, lam)
 
-        feat = F.avg_pool2d(x, x.size()[3])
-        feat = feat.view(feat.size(0), -1)
+        feat = self.feature(x)
         out = self.fc(feat)
 
         return out, target, feat
@@ -385,20 +389,6 @@ class ResNet(nn.Module):
             self.fc.weight.requires_grad_(False)
 
     def _make_layer(self, block, out_channels, num_blocks, stride, **kwargs):
-        """make resnet layers(by layer i didnt mean this 'layer' was the
-        same as a neuron netowork layer, ex. conv layer), one layer may
-        contain more than one residual block
-        Args:
-            block: block type, basic block or bottle neck block
-            out_channels: output depth channel number of this layer
-            num_blocks: how many blocks per layer
-            stride: the stride of the first block of this layer
-
-        Return:
-            return a resnet layer
-        """
-        # we have num_block blocks per layer, the first block
-        # could be 1 or 2, other blocks would always be 1
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
@@ -474,7 +464,7 @@ def resnet18(args=None):
     return ResNet(BasicBlock, [2, 2, 2, 2], args=args)
 
 
-def resnet32(args=None):
+def mresnet32(args=None):
     return ResNet_modify(BasicBlock_s, [5, 5, 5], args=args)
 
 

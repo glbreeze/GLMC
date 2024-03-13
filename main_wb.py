@@ -31,8 +31,8 @@ def get_model(args):
             net = ResNet_new.iresnet50(args=args)
         elif args.arch == 'resnet18':
             net = ResNet_new.resnet18(args=args)
-        elif args.arch == 'resnet32':
-            net = ResNet_new.resnet32(args=args)
+        elif args.arch == 'mresnet32':
+            net = ResNet_new.mresnet32(args=args)
         elif args.arch == 'resnet34':
             net = ResNet_new.resnet34(args=args)
 
