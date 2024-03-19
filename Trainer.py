@@ -192,11 +192,11 @@ class Trainer(object):
                                'nc/nc3d': nc_dict['nc3_d'],
                                },
                               step=epoch + 1)
-                    if self.args.imbalance_type == 'step':
+                    if self.args.imbalance_type == 'step' and self.args.imbalance_rate < 1.0:
                         wandb.log({'nc1/w_mnorm': nc_dict['w_mnorm'],
-                                   'nc1/h_mnorm': nc_dict['h_mnorm'],
                                    'nc1/w_mnorm1': nc_dict['w_mnorm1'],
                                    'nc1/w_mnorm2': nc_dict['w_mnorm2'],
+                                   'nc1/h_mnorm': nc_dict['h_mnorm'],
                                    'nc1/h_mnorm1': nc_dict['h_mnorm1'],
                                    'nc1/h_mnorm2': nc_dict['h_mnorm2'],
                                    'nc1/w_cos1': nc_dict['w_cos1'],

@@ -211,7 +211,6 @@ class ResNet_modify(nn.Module):
         self.args = args
         self.num_classes = args.num_classes
         self.etf_cls = args.etf_cls
-        self.fnorm = args.fnorm
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_planes)
@@ -220,34 +219,34 @@ class ResNet_modify(nn.Module):
         self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
         self.out_dim = 4 * nf * block.expansion
 
-        if self.args.fnorm == 'none' or self.args.fnorm == 'null':
+        if self.args.feat == 'none' or self.args.feat == 'null':
             self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.args.fnorm == 'b':
-            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+        elif self.args.feat == 'b':
+            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
                                          nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.args.fnorm == 'bfb':
-            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+        elif self.args.feat == 'bfb':
+            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
                                          nn.Flatten(),
-                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
-                                         nn.BatchNorm1d(512 * block.expansion)
+                                         nn.Linear(self.out_dim * 4 * 4, self.out_dim),
+                                         nn.BatchNorm1d(self.out_dim)
                                          )
-        elif self.args.fnorm.startswith('bfb_d'):  # with_dropout
-            dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
-            self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
+        elif self.args.feat.startswith('bfb_d'):  # with_dropout
+            dropout_rate = float(self.args.feat.replace('bfb_d', ''))
+            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
                                          nn.Flatten(),
                                          nn.Dropout(dropout_rate),
-                                         nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
-                                         nn.BatchNorm1d(512 * block.expansion)
+                                         nn.Linear(self.out_dim * 4 * 4, self.out_dim),
+                                         nn.BatchNorm1d(self.out_dim)
                                          )
 
         if args.loss.endswith('m'):  # m for margin
-            self.fc = LinearLayer(512 * block.expansion, self.num_class)
+            self.fc = LinearLayer(self.out_dim, self.num_classes)
         else:
-            self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=True)  # may need to change the bias
+            self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias)  # may need to change the bias
             self.apply(_weights_init)
 
         if self.etf_cls:
@@ -274,7 +273,7 @@ class ResNet_modify(nn.Module):
         out = self.layer3(out)
 
         feat = self.feature(out)
-        if self.args.norm == 'f':
+        if self.args.norm:
             feat = F.normalize(feat, p=2, dim=-1)
         out = self.fc(feat)
 
@@ -351,23 +350,23 @@ class ResNet(nn.Module):
         self.conv5_x = self._make_layer(block, 512, num_block[3], 2, **layer_kwargs)
         self.out_dim = 512 * block.expansion
 
-        if self.args.fnorm == 'none' or self.args.fnorm == 'null':
+        if self.args.feat == 'none' or self.args.feat == 'null':
             self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.args.fnorm == 'b':
+        elif self.args.feat == 'b':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.args.fnorm == 'bfb':
+        elif self.args.feat == 'bfb':
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
                                          nn.Linear(512 * block.expansion * 4 * 4, 512 * block.expansion),
                                          nn.BatchNorm1d(512 * block.expansion)
             )
-        elif self.args.fnorm.startswith('bfb_d'):   # with_dropout
-            dropout_rate = float(self.args.fnorm.replace('bfb_d', ''))
+        elif self.args.feat.startswith('bfb_d'):   # with_dropout
+            dropout_rate = float(self.args.feat.replace('bfb_d', ''))
             self.feature = nn.Sequential(nn.BatchNorm2d(512 * block.expansion),
                                          nn.Flatten(),
                                          nn.Dropout(dropout_rate),
@@ -377,7 +376,7 @@ class ResNet(nn.Module):
         if args.loss.endswith('m'):  # m for margin
             self.fc = LinearLayer(512 * block.expansion, self.num_class)
         else:
-            self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=True)                   # may need to change the bias
+            self.fc = nn.Linear(512 * block.expansion, self.num_class, bias=self.args.bias)                   # may need to change the bias
             self.apply(_weights_init)
 
         if self.args.etf_cls:
@@ -405,7 +404,7 @@ class ResNet(nn.Module):
         output = self.conv5_x(output)
 
         feat = self.feature(output)
-        if self.args.norm == 'f': 
+        if self.args.norm: 
             feat = F.normalize(feat, p=2, dim=-1)
         out = self.fc(feat)
 

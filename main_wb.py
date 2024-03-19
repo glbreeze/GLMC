@@ -59,7 +59,7 @@ def main(args):
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
-    wandb.init(project='lg_'+args.dataset,
+    wandb.init(project='lg3_'+args.dataset,
                name= args.store_name.split('/')[-1]
                )
     wandb.config.update(args)
@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
+    parser.add_argument('--batch_size', default=64, type=int, metavar='N', help='mini-batch size')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
     parser.add_argument('--wd', '--weight_decay', default=5e-3, type=float, metavar='W', help='weight decay (default: 5e-3、2e-4、1e-4)', dest='weight_decay')
 
@@ -154,8 +154,9 @@ if __name__ == '__main__':
     parser.add_argument('--contrast_weight', default=10, type=int, help='Mixture Consistency  Weights')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
 
-    parser.add_argument('--fnorm', type=str, default='none')  # none|nn1|nn2
-    parser.add_argument('--norm', type=str, default='null')  # none|nn1|nn2
+    parser.add_argument('--feat', type=str, default='none')  # none|nn1|nn2
+    parser.add_argument('--norm', default=False, action='store_true')  # none|nn1|nn2
+    parser.add_argument('--bias', default=False, action='store_true')  # none|nn1|nn2
     parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
     parser.add_argument('--margins', type=str, default='1.0_0.5_0.0')
     parser.add_argument('--eps', type=float, default=0.05)  # for ls loss

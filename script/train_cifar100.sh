@@ -10,9 +10,8 @@
 #SBATCH --partition=a100_1,a100_2,v100,rtx8000
 
 # job info
-IB=$1
-FNORM=$2
-ARCH=$3
+LOSS=$1
+FEAT=$2
 
 
 # Singularity path
@@ -25,6 +24,10 @@ singularity exec --nv \
 --overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_wb.py --dataset cifar100 -a ${ARCH} --imbalance_rate ${IB} --imbalance_type step --beta 0.5 --lr 0.01 --seed 2021 \
- --epochs 200 --loss ce --fnorm ${FNORM} --resample_weighting 0 --mixup -1 --mixup_alpha 1 --store_name ${ARCH}_ce_ib${IB}_${FNORM}
+python main_wb.py --dataset cifar100 -a mresnet32 --imbalance_rate 0.01 --imbalance_type step --lr 0.01 --seed 2021 \
+ --epochs 200 --loss ${LOSS} --feat ${FEAT} --etf_cls --mixup -1 --mixup_alpha 1 \
+ --store_name 0.01_mresnet32_${LOSS}_etf_${FEAT}_nb
  " 
+
+
+ # --bias 
