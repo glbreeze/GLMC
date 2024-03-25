@@ -1,5 +1,74 @@
 import torch
+import torch.nn as nn
 import numpy as np
+
+
+class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
+    """
+    A sequential module that passes timestep embeddings to the children that
+    support it as an extra input.
+    """
+
+    def forward(self, x, emb):
+        for layer in self:
+            if isinstance(layer, TimestepBlock):
+                x = layer(x, emb)
+            else:
+                x = layer(x)
+        return x
+
+class BalancedBatchNorm2d(nn.Module):
+    # num_features: the number of output channels for a convolutional layer.
+    def __init__(self, num_features, ):
+        super().__init__()
+        shape = (1, num_features, 1, 1)
+        # The scale parameter and the shift parameter
+        self.gamma = nn.Parameter(torch.ones(shape))
+        self.beta = nn.Parameter(torch.zeros(shape))
+        # moving_mean and moving_var are initialized to 0 and 1
+        self.moving_mean = torch.zeros(shape)
+        self.moving_var = torch.ones(shape)
+
+    def forward(self, X, label):
+        # If X is not on the main memory, copy moving_mean and moving_var to the device where X is located
+        if self.moving_mean.device != X.device:
+            self.moving_mean = self.moving_mean.to(X.device)
+            self.moving_var = self.moving_var.to(X.device)
+        # Save the updated moving_mean and moving_var
+        Y, self.moving_mean, self.moving_var = batch_norm(
+            X, self.gamma, self.beta, self.moving_mean, self.moving_var, eps=1e-6, momentum=0.1
+        )
+        return Y
+
+
+def batch_norm(X, label, gamma, beta, moving_mean, moving_var, eps, momentum):
+    # Use is_grad_enabled to determine whether we are in training mode
+    if not torch.is_grad_enabled():
+        X_hat = (X - moving_mean) / torch.sqrt(moving_var + eps)
+    else:
+        assert len(X.shape) in (2, 4)
+        if len(X.shape) == 2:
+            # When using a fully connected layer, calculate the mean and variance on the feature dimension
+            mean = X.mean(dim=0)
+            var = ((X - mean) ** 2).mean(dim=0)
+        else:
+            # When using a two-dimensional conv layer, calculate mean and variance on channel dimension (axis=1).
+            batch_size, C, H, W = X.shape
+            sum_ = torch.zeros((torch.unique(label).size(0), C, H, W), dtype=X.dtype)   # [B, C, H, W], sum over Batch
+            sum_.index_add_(dim=0, index=label, source=X)    # [K, C, H, W]
+            cnt_ = torch.bincount(label)
+            avg_feat = sum_/cnt_[:, None, None, None]        # [K, C, H, W]  class-wise mean feat
+            mean = avg_feat.mean(dim=(0, 2, 3), keepdim=True)  # channel mean (equal weight for all classes)
+
+            var = ((X - mean) ** 2).mean(dim=(0, 2, 3), keepdim=True)
+
+        # In training mode, the current mean and variance are used
+        X_hat = (X - mean) / torch.sqrt(var + eps)
+        # Update the mean and variance using moving average
+        moving_mean = (1.0 - momentum) * moving_mean + momentum * mean
+        moving_var = (1.0 - momentum) * moving_var + momentum * var
+    Y = gamma * X_hat + beta  # Scale and shift
+    return Y, moving_mean.data, moving_var.data
 
 
 def get_lambda(alpha=1.0):
