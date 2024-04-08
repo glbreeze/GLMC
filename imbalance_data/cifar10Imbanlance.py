@@ -87,4 +87,6 @@ class Cifar10Imbalance(Dataset):
             "x": rehearsal_data,
             "y": rehearsal_label,
         }
+        # split the data into majority class and minority class
+
         return task_split

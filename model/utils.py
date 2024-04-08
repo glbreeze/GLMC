@@ -3,20 +3,6 @@ import torch.nn as nn
 import numpy as np
 
 
-class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
-    """
-    A sequential module that passes timestep embeddings to the children that
-    support it as an extra input.
-    """
-
-    def forward(self, x, emb):
-        for layer in self:
-            if isinstance(layer, TimestepBlock):
-                x = layer(x, emb)
-            else:
-                x = layer(x)
-        return x
-
 class BalancedBatchNorm2d(nn.Module):
     # num_features: the number of output channels for a convolutional layer.
     def __init__(self, num_features, ):
@@ -36,7 +22,7 @@ class BalancedBatchNorm2d(nn.Module):
             self.moving_var = self.moving_var.to(X.device)
         # Save the updated moving_mean and moving_var
         Y, self.moving_mean, self.moving_var = batch_norm(
-            X, self.gamma, self.beta, self.moving_mean, self.moving_var, eps=1e-6, momentum=0.1
+            X, label, self.gamma, self.beta, self.moving_mean, self.moving_var, eps=1e-6, momentum=0.1
         )
         return Y
 

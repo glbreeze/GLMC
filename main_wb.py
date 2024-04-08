@@ -97,6 +97,8 @@ def main_worker(args):
 
     # ================= Data loading code =================
     train_dataset, val_dataset = get_dataset(args)
+    # train_dataset_minority = copy(train_dataset)
+    # change train_dataset_minority.data to keep the minory class only
     num_classes = len(np.unique(train_dataset.targets))
     assert num_classes == args.num_classes
 

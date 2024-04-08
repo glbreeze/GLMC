@@ -58,15 +58,30 @@ class SEBlock(nn.Module):
         return x * y
 
 
+class BNSequential(nn.Sequential):
+    def forward(self, x, label):
+        for layer in self:
+            if isinstance(layer, BalancedBatchNorm2d):
+                x = layer(x, label)
+            else:
+                x = layer(x)
+        return x
+
+
 class BasicBlock_s(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, option='A'):
+    def __init__(self, in_planes, planes, stride=1, option='A', norm_layer=nn.BatchNorm2d):
         super(BasicBlock_s, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.cbr1 = BNSequential(
+            nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False),
+            norm_layer(planes),
+            nn.ReLU()
+        )
+        self.cb2 = BNSequential(
+            nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False),
+            norm_layer(planes)
+        )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
@@ -74,19 +89,20 @@ class BasicBlock_s(nn.Module):
                 """
                 For CIFAR10 ResNet paper uses option A.
                 """
-                self.shortcut = LambdaLayer(lambda x:
-                                            F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes // 4, planes // 4), "constant",
-                                                  0))
+                self.shortcut = BNSequential(LambdaLayer(lambda x:
+                                                         F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes // 4, planes // 4), "constant",0)
+                                                         )
+                                             )
             elif option == 'B':
-                self.shortcut = nn.Sequential(
+                self.shortcut = BNSequential(
                     nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
-                    nn.BatchNorm2d(self.expansion * planes)
+                    norm_layer(self.expansion * planes)
                 )
 
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
+    def forward(self, x, label):
+        out = self.cbr1(x,  label)
+        out = self.cb2(out, label)
+        out += self.shortcut(x, label)
         out = F.relu(out)
         return out
 
