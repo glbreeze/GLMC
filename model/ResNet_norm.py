@@ -83,7 +83,7 @@ class BasicBlock_s(nn.Module):
             norm_layer(planes)
         )
 
-        self.shortcut = nn.Sequential()
+        self.shortcut = BNSequential()
         if stride != 1 or in_planes != planes:
             if option == 'A':
                 """
@@ -221,45 +221,53 @@ class BottleNeck(nn.Module):
 # ======================== modified ResNet ========================
 class ResNet_modify(nn.Module):
 
-    def __init__(self, block, num_blocks, nf=64, args=None, norm_layer=nn.BatchNorm2d):
+    def __init__(self, block, num_blocks, nf=64, args=None):
         super(ResNet_modify, self).__init__()
         self.in_planes = nf
         self.args = args
         self.num_classes = args.num_classes
         self.etf_cls = args.etf_cls
 
-        self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = norm_layer(self.in_planes)
-        self.layer1 = self._make_layer(block, 1 * nf, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2)
+        if args.bn_type == 'cbn':
+            norm_layer = BalancedBatchNorm2d
+        else:
+            norm_layer = nn.BatchNorm2d
+
+        self.cbr = BNSequential(nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False),
+                                norm_layer(self.in_planes),
+                                nn.ReLU()
+                                )
+
+        self.layer1 = self._make_layer(block, 1 * nf, num_blocks[0], stride=1, norm_layer=norm_layer)
+        self.layer2 = self._make_layer(block, 2 * nf, num_blocks[1], stride=2, norm_layer=norm_layer)
+        self.layer3 = self._make_layer(block, 4 * nf, num_blocks[2], stride=2, norm_layer=norm_layer)
         self.out_dim = 4 * nf * block.expansion
 
         if self.args.feat == 'none' or self.args.feat == 'null':
-            self.feature = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+            self.feature = BNSequential(nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
         elif self.args.feat == 'b':
-            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
+            self.feature = BNSequential(norm_layer(self.out_dim),
                                          nn.AdaptiveAvgPool2d((1, 1)),
                                          nn.Flatten()
                                          )
-        elif self.args.feat == 'bfb':
-            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
-                                         nn.Flatten(),
-                                         nn.Linear(self.out_dim * 4 * 4, self.out_dim),
-                                         nn.BatchNorm1d(self.out_dim)
-                                         )
+        elif self.args.feat == 'bfb':                                              # still need to fix norm layer
+            self.feature = BNSequential(nn.BatchNorm2d(self.out_dim),
+                                        nn.Flatten(),
+                                        nn.Linear(self.out_dim * 4 * 4, self.out_dim),
+                                        nn.BatchNorm1d(self.out_dim)
+                                        )
         elif self.args.feat.startswith('bfb_d'):  # with_dropout
             dropout_rate = float(self.args.feat.replace('bfb_d', ''))
-            self.feature = nn.Sequential(nn.BatchNorm2d(self.out_dim),
+            self.feature = BNSequential(nn.BatchNorm2d(self.out_dim),
                                          nn.Flatten(),
                                          nn.Dropout(dropout_rate),
                                          nn.Linear(self.out_dim * 4 * 4, self.out_dim),
                                          nn.BatchNorm1d(self.out_dim)
                                          )
 
-        if args.loss.endswith('m'):  # m for margin
+        if args.loss.endswith('m'):  # m for margin loss, linear layer which normalize both feature and weight w
             self.fc = LinearLayer(self.out_dim, self.num_classes)
         else:
             self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias)  # may need to change the bias
@@ -273,22 +281,22 @@ class ResNet_modify(nn.Module):
             self.fc.weight = nn.Parameter(torch.mm(weight, torch.eye(self.num_classes, self.out_dim)))  # [K, d]
             self.fc.weight.requires_grad_(False)
 
-    def _make_layer(self, block, planes, num_blocks, stride):
+    def _make_layer(self, block, planes, num_blocks, stride, norm_layer=nn.BatchNorm2d):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
+            layers.append(block(self.in_planes, planes, stride, norm_layer=norm_layer))
             self.in_planes = planes * block.expansion
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, ret=None):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
+    def forward(self, x, label, ret=None):
+        out = self.cbr(x, label)
+        out = self.layer1(out, label)
+        out = self.layer2(out, label)
+        out = self.layer3(out, label)
 
-        feat = self.feature(out)
+        feat = self.feature(out, label)
         if self.args.norm:
             feat = F.normalize(feat, p=2, dim=-1)
         out = self.fc(feat)
