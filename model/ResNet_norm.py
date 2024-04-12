@@ -61,7 +61,7 @@ class SEBlock(nn.Module):
 class BNSequential(nn.Sequential):
     def forward(self, x, label):
         for layer in self:
-            if isinstance(layer, BalancedBatchNorm2d):
+            if isinstance(layer, BalancedBatchNorm2d) or isinstance(layer, BasicBlock_s):
                 x = layer(x, label)
             else:
                 x = layer(x)
@@ -288,7 +288,7 @@ class ResNet_modify(nn.Module):
             layers.append(block(self.in_planes, planes, stride, norm_layer=norm_layer))
             self.in_planes = planes * block.expansion
 
-        return nn.Sequential(*layers)
+        return BNSequential(*layers)
 
     def forward(self, x, label, ret=None):
         out = self.cbr(x, label)

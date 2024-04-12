@@ -31,7 +31,7 @@ def get_samples_per_class(dataset, num_samples_per_class=10, num_classes=10):
     samples_per_class = {k: [] for k in range(num_classes)}
     for idx, (image, label) in enumerate(dataset):
         if len(samples_per_class[label]) < num_samples_per_class:
-            samples_per_class[label].append(image)
+            samples_per_class[label].append(image.unsqueeze(0))
         if all(len(samples) == num_samples_per_class for samples in samples_per_class.values()):
             break
     return samples_per_class
@@ -112,13 +112,13 @@ class Trainer_bn(object):
                 output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
                                                                          mixup_alpha=self.args.mixup_alpha)
             else:
-                freq = torch.bincount(targets, minlength=args.num_classes)
-                cls_idx = torch.where(freq==0)
-                bn_inputs = torch.cat([self.queue[k] for k in cls_idx], dim=0).to(self.device)
-                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx], dim=0).to(self.device)
+                freq = torch.bincount(targets, minlength=self.args.num_classes)
+                cls_idx = torch.where(freq==0)[0]
+                bn_inputs = torch.cat([self.queue[k] for k in cls_idx.numpy()], dim=0).to(self.device)
+                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.numpy()], dim=0).to(self.device)
 
-                all_inputs = torch.cat(inputs, bn_inputs)
-                all_targets = torch.cat(targets, bn_targets)
+                all_inputs = torch.cat([inputs, bn_inputs])
+                all_targets = torch.cat([targets, bn_targets])
 
                 output_all, h_all = self.model(all_inputs, all_targets, ret='of')
                 output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
