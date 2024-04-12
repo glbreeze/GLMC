@@ -25,8 +25,8 @@ class Cifar100Imbalance(Dataset):
         else:
             self.data = self.produce_test_data()
         self.x = self.data['x']
-        self.y = self.data['y']
-        self.targets = self.data['y']
+        self.y = self.data['y'].tolist()
+        self.targets = self.data['y'].tolist()
 
     def __len__(self):
         return len(self.x)
@@ -106,7 +106,7 @@ class Cifar100Imbalance(Dataset):
 
         dataset = {
             "x": data_x,
-            "y": data_y.tolist(),
+            "y": data_y,
         }
 
         return dataset

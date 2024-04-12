@@ -27,22 +27,39 @@ def soften_target(targets, num_classes, epsilon):
     return targets
 
 
+def get_samples_per_class(dataset, num_samples_per_class=10, num_classes=10):
+    samples_per_class = {k: [] for k in range(num_classes)}
+    for idx, (image, label) in enumerate(dataset):
+        if len(samples_per_class[label]) < num_samples_per_class:
+            samples_per_class[label].append(image)
+        if all(len(samples) == num_samples_per_class for samples in samples_per_class.values()):
+            break
+    return samples_per_class
+
+
 class Trainer_bn(object):
     def __init__(self, args, model=None,train_loader=None, val_loader=None,weighted_train_loader=None,per_class_num=[],log=None):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.args = args
         self.print_freq = args.print_freq
         self.label_weighting = args.label_weighting
-        self.use_cuda = True
         self.num_classes = args.num_classes
+
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.weighted_train_loader = weighted_train_loader
-        self.img_bank = {k: None for k in range(args.num_classes)}
+
+        # init queue
+        samples_per_class = get_samples_per_class(train_loader.dataset,
+                                                  num_samples_per_class=np.ceil(args.batch_size/args.num_classes),
+                                                  num_classes=args.num_classes)
+        self.queue = {k: torch.cat(samples_per_class[k], dim=0).to(self.device) for k in range(args.num_classes)}
+        self.queue_ptr = {k: torch.zeros(1, dtype=torch.long) for k in range(args.num_classes)}
+
         self.per_cls_weights = None
         self.cls_num_list = per_class_num
         self.contrast_weight = args.contrast_weight
         self.log = log
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.model = model
         self.optimizer = torch.optim.SGD(self.model.parameters(), momentum=0.9, lr=args.lr, weight_decay=args.weight_decay)
@@ -87,17 +104,37 @@ class Trainer_bn(object):
         for i, (inputs, targets) in enumerate(train_loader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
-            if self.args.aug == 'cm' or self.args.aug == 'cutmix':
+            if self.args.aug == 'cm' or self.args.aug == 'cutmix':     # cutmix augmentation within the mini-batch
                 cutmix = v2.CutMix(num_classes=self.args.num_classes)
-                inputs, reweighted_targets = cutmix(inputs, targets)
+                inputs, reweighted_targets = cutmix(inputs, targets)   # reweighted target will be [B, K]
 
             if self.args.mixup >= 0:
                 output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
                                                                          mixup_alpha=self.args.mixup_alpha)
             else:
-                output, h = self.model(inputs, ret='of')
+                freq = torch.bincount(targets, minlength=args.num_classes)
+                cls_idx = torch.where(freq==0)
+                bn_inputs = torch.cat([self.queue[k] for k in cls_idx], dim=0).to(self.device)
+                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx], dim=0).to(self.device)
 
-            # update the img_bank 
+                all_inputs = torch.cat(inputs, bn_inputs)
+                all_targets = torch.cat(targets, bn_targets)
+
+                output_all, h_all = self.model(all_inputs, all_targets, ret='of')
+                output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
+
+            # update the img_bank with current batch
+            for k in self.queue:
+                cls_idx = torch.where(targets == k)[0]
+                if len(cls_idx) == 0:
+                    pass
+                else:
+                    ptr = self.queue_ptr[k]
+                    num_cls = min(len(self.queue[k]), len(cls_idx))
+
+                    # replace the keys at ptr (dequeue and enqueue)
+                    self.queue[k][ptr:ptr + num_cls] = inputs[cls_idx][:num_cls]
+                    self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
 
             # ==== update loss and acc
             train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
