@@ -45,7 +45,7 @@ def analysis(model, loader, args):
     with torch.no_grad():
         for data, target in loader:
             data, target = data.to(device), target.to(device)
-            logits, feats = model(data, ret='of')
+            logits, feats = model(data, target, ret='of')
             logits_list.append(logits)
             labels_list.append(target)
             feats_list.append(feats)

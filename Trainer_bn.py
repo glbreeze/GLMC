@@ -114,11 +114,14 @@ class Trainer_bn(object):
             else:
                 freq = torch.bincount(targets, minlength=self.args.num_classes)
                 cls_idx = torch.where(freq==0)[0]
-                bn_inputs = torch.cat([self.queue[k] for k in cls_idx.numpy()], dim=0).to(self.device)
-                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.numpy()], dim=0).to(self.device)
+                if len(cls_idx) > 0: 
+                    bn_inputs = torch.cat([self.queue[k] for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
+                    bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
 
-                all_inputs = torch.cat([inputs, bn_inputs])
-                all_targets = torch.cat([targets, bn_targets])
+                    all_inputs = torch.cat([inputs, bn_inputs])
+                    all_targets = torch.cat([targets, bn_targets])
+                else: 
+                    all_inputs, all_targets = inputs, targets
 
                 output_all, h_all = self.model(all_inputs, all_targets, ret='of')
                 output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
@@ -130,11 +133,16 @@ class Trainer_bn(object):
                     pass
                 else:
                     ptr = self.queue_ptr[k]
-                    num_cls = min(len(self.queue[k]), len(cls_idx))
+                    num_cls = min(len(self.queue[k]), len(cls_idx))                  
 
                     # replace the keys at ptr (dequeue and enqueue)
-                    self.queue[k][ptr:ptr + num_cls] = inputs[cls_idx][:num_cls]
+                    if ptr + num_cls <= len(self.queue[k]):
+                        self.queue[k][ptr:ptr + num_cls] = inputs[cls_idx][:num_cls]
+                    else: 
+                        self.queue[k][ptr:] = inputs[cls_idx][num_cls-(len(self.queue[k])-ptr):num_cls]
+                        self.queue[k][:num_cls-(len(self.queue[k])-ptr)] = inputs[cls_idx][:num_cls-(len(self.queue[k])-ptr)]
                     self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
+                    
 
             # ==== update loss and acc
             train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
@@ -269,7 +277,7 @@ class Trainer_bn(object):
             for i, (input, target) in enumerate(self.val_loader):
                 input, target = input.to(self.device), target.to(self.device)
 
-                output = self.model(input, ret='o')
+                output = self.model(input, target, ret='o')
                 all_logits.append(output)
                 all_targets.append(target)
             all_logits = torch.cat(all_logits)
@@ -302,7 +310,7 @@ class Trainer_bn(object):
         with torch.no_grad():
             for i, (input, target) in enumerate(self.val_loader):
                 input, target = input.to(self.device), target.to(self.device)
-                _, feats = self.model(input, ret='of')  # pred from fc_bc
+                _, feats = self.model(input, target, ret='of')  # pred from fc_bc
                 logit = self.knn_classifier(feats)
                 all_logits.append(logit)
                 all_targets.append(target)
@@ -379,7 +387,7 @@ class Trainer_bn(object):
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 # Calculate Features of each training data
-                _, feats = self.model(inputs, ret='of')
+                _, feats = self.model(inputs, labels, ret='of')
                 feats_all.append(feats.cpu().numpy())
                 labels_all.append(labels.cpu().numpy())
 
