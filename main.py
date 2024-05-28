@@ -48,7 +48,8 @@ def get_dataset(args):
         return trainset,testset
 
     if args.dataset == 'cifar100':
-        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=util.TwoCropTransform(transform_train),imbanlance_rate=args.imbanlance_rate, train=True,file_path=os.path.join(args.root,'cifar-100-python/'))
+        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=util.TwoCropTransform(transform_train),imbanlance_rate=args.imbanlance_rate,
+                                                         train=True,file_path=os.path.join(args.root,'cifar-100-python/'))
         testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False, transform=transform_val,file_path=os.path.join(args.root,'cifar-100-python/'))
         print("load cifar100")
         return trainset,testset
@@ -113,6 +114,7 @@ def main_worker(gpu, args):
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
+
     log_format = '%(asctime)s %(message)s'
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M:%S %p')
     fh = logging.FileHandler(os.path.join(args.root_log + args.store_name, 'log.txt'))
@@ -134,10 +136,8 @@ def main_worker(gpu, args):
     for label in train_dataset.targets:
         cls_num_list[label] += 1
     train_cls_num_list = np.array(cls_num_list)
-    train_sampler = None
-    weighted_train_loader = None
 
-    #weighted_loader
+    # ==== weighted_loader
     cls_weight = 1.0 / (np.array(cls_num_list) ** args.resample_weighting)
     cls_weight = cls_weight / np.sum(cls_weight) * len(cls_num_list)
     samples_weight = np.array([cls_weight[t] for t in train_dataset.targets])
