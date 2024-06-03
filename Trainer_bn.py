@@ -286,7 +286,7 @@ class Trainer_bn(object):
                                    'nc1/h_cos2': nc_dict['h_cos2'],
                                    'nc1/h_cos3': nc_dict['h_cos3']},
                                   step=epoch + 1)
-                    val_nc_dict = analysis_feat(val_targets, val_feats, val_logits, self.args)
+                    val_nc_dict = analysis_feat(self.model, val_targets, val_feats, val_logits, self.args)
                     val_nc.load_dt(val_nc_dict, epoch=epoch + 1, lr=self.optimizer.param_groups[0]['lr'])
                     wandb.log({'nc_val/loss': nc_dict['loss'],
                                'nc_val/acc': nc_dict['acc'],

@@ -26,8 +26,8 @@ singularity exec --nv \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
 python main_bn.py --dataset cifar10 -a mresnet32 --imbalance_rate 0.01 --imbalance_type step --lr 0.01 --seed 2021 \
- --epochs 200 --loss ${LOSS} --etf_cls --feat ${FEAT} --bn_type ${BN}  --norm --bias --mixup -1 --mixup_alpha 1 \
- --store_name 0.01_mresnet32_etf_${LOSS}_${FEAT}_${BN}_nb
+ --epochs 200 --loss ${LOSS} --feat ${FEAT} --bn_type ${BN} --aug pc --bias --mixup -1 --mixup_alpha 1 \
+ --store_name 0.01_mresnet32_${LOSS}_${FEAT}_${BN}_b_pc
  " 
 
 

@@ -13,10 +13,10 @@ from utils import util
 from utils.util import *
 from model import ResNet_cifar
 from model import Resnet_LT
-from imbalance_data import cifar10Imbanlance,cifar100Imbanlance,dataset_lt_data
+from imbalance_data import dataset_lt_data, cifar100Imbanlance, cifar10Imbanlance
 import logging
 import datetime
-import math
+import wandb
 from sklearn.metrics import confusion_matrix
 from Trainer import Trainer
 
@@ -42,15 +42,15 @@ def get_model(args):
 def get_dataset(args):
     transform_train,transform_val = util.get_transform(args.dataset)
     if args.dataset == 'cifar10':
-        trainset = cifar10Imbanlance.Cifar10Imbanlance(transform=util.TwoCropTransform(transform_train),imbanlance_rate=args.imbanlance_rate, train=True,file_path=args.root)
-        testset = cifar10Imbanlance.Cifar10Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False, transform=transform_val,file_path=args.root)
+        trainset = cifar10Imbanlance.Cifar10Imbalance(transform=util.TwoCropTransform(transform_train),imbalance_rate=args.imbalance_rate, train=True,file_path=args.root)
+        testset = cifar10Imbanlance.Cifar10Imbalance(imbalance_rate=args.imbalance_rate, train=False, transform=transform_val,file_path=args.root)
         print("load cifar10")
         return trainset,testset
 
     if args.dataset == 'cifar100':
-        trainset = cifar100Imbanlance.Cifar100Imbanlance(transform=util.TwoCropTransform(transform_train),imbanlance_rate=args.imbanlance_rate,
+        trainset = cifar100Imbanlance.Cifar100Imbalance(transform=util.TwoCropTransform(transform_train),imbalance_rate=args.imbalance_rate,
                                                          train=True,file_path=os.path.join(args.root,'cifar-100-python/'))
-        testset = cifar100Imbanlance.Cifar100Imbanlance(imbanlance_rate=args.imbanlance_rate, train=False, transform=transform_val,file_path=os.path.join(args.root,'cifar-100-python/'))
+        testset = cifar100Imbanlance.Cifar100Imbalance(imbalance_rate=args.imbalance_rate, train=False, transform=transform_val,file_path=os.path.join(args.root,'cifar-100-python/'))
         print("load cifar100")
         return trainset,testset
 
@@ -64,12 +64,8 @@ def get_dataset(args):
         testset = dataset_lt_data.LT_Dataset(args.root, args.dir_test_txt,transform_val)
         return trainset,testset
 
-def main():
-    args = parser.parse_args()
-    print(args)
-    curr_time = datetime.datetime.now()
-    args.store_name = '_'.join([args.dataset, args.arch, str(args.imbanlance_rate),
-                                datetime.datetime.strftime(curr_time, '%Y-%m-%d')])
+def main(args):
+    
     prepare_folders(args)
     if args.seed is not None:
         random.seed(args.seed)
@@ -79,26 +75,29 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
         cudnn.deterministic = True
         cudnn.benchmark = True
-    main_worker(args.gpu, args)
+        
+    os.environ["WANDB_API_KEY"] = "0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee"
+    os.environ["WANDB_MODE"] = "online" #"dryrun"
+    os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
+    os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
+    wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
+    wandb.init(project='bn_'+args.dataset,
+               name= args.store_name.split('/')[-1]
+               )
+    wandb.config.update(args)
+    main_worker(wandb.config)
 
-def main_worker(gpu, args):
+def main_worker(args):
 
     global best_acc1
     global train_cls_num_list
     global cls_num_list_cuda
 
-    args.gpu = gpu
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
     # create model
     model = get_model(args)
     _ = print_model_param_nums(model=model)
-    if args.gpu is not None:
-        torch.cuda.set_device(args.gpu)
-        model = model.cuda(args.gpu)
-    else:
-        # DataParallel will divide and allocate batch_size to all available GPUs
-        model = torch.nn.DataParallel(model).cuda()
+    if torch.cuda.is_available():
+        model = model.cuda()
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -107,20 +106,18 @@ def main_worker(gpu, args):
             checkpoint = torch.load(args.resume, map_location='cuda:0')
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_acc1']
-            if args.gpu is not None:
-                # best_acc1 may be from a checkpoint from a different GPU
-                best_acc1 = best_acc1.to(args.gpu)
             model.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-
+    
     log_format = '%(asctime)s %(message)s'
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M:%S %p')
-    fh = logging.FileHandler(os.path.join(args.root_log + args.store_name, 'log.txt'))
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M')
+    fh = logging.FileHandler(os.path.join(args.root_model + args.store_name, 'log.txt'))
     fh.setFormatter(logging.Formatter(log_format))
     logger = logging.getLogger()
     logger.addHandler(fh)
+    logging.info(args)
 
     # Data loading code
     train_dataset,val_dataset = get_dataset(args)
@@ -161,7 +158,8 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
-    parser.add_argument('--imbanlance_rate', default=0.01, type=float, help='imbalance factor')
+    parser.add_argument('--imbalance_type', default='exp', type=str, help='imbalance type')
+    parser.add_argument('--imbalance_rate', default=0.01, type=float, help='imbalance factor')
     parser.add_argument('--beta', type=float, default=0.5, help="augment mixture")
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, metavar='LR', help='initial learning rate',dest='lr')
     parser.add_argument('--epochs', default=200, type=int, metavar='N', help='number of total epochs to run')
@@ -179,8 +177,31 @@ if __name__ == '__main__':
     parser.add_argument('--resume', default=None, type=str, metavar='PATH',help='path to latest checkpoint (default: none)')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',help='manual epoch number (useful on restarts)')
     parser.add_argument('--root_log', type=str, default='./output/log/')
-    parser.add_argument('--root_model', type=str, default='./output/log/')
+    parser.add_argument('--root_model', type=str, default='./output/')
     parser.add_argument('--store_name', type=str, default='cifar')
     
     parser.add_argument('--debug',  type=int, default=10)
-    main()
+    args = parser.parse_args()
+    
+    if args.dataset == 'cifar10' or args.dataset == 'fmnist':
+        args.num_classes = 10
+    elif args.dataset == 'cifar100':
+        args.num_classes = 100
+    elif args.dataset == 'ImageNet-LT':
+        args.num_classes = 1000
+    elif args.dataset == 'iNaturelist2018':
+        args.num_classes = 8142
+    elif args.dataset == 'tinyi':
+        args.num_classes = 200
+    if args.imbalance_rate < 1.0:
+        args.knn = True
+    
+    file_name = args.store_name
+    args.store_name = '{}_{}/{}/{}'.format(
+        args.dataset, args.arch,
+        args.imbalance_type + '_' + str(args.imbalance_rate),
+        file_name
+    )
+    print(args)
+    
+    main(args)

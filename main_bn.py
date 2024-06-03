@@ -203,7 +203,7 @@ if __name__ == '__main__':
     file_name = args.store_name
     args.store_name = '{}_{}/{}/{}'.format(
         args.dataset, args.arch,
-        str(args.imbalance_rate),
+        args.imbalance_type + '_' + str(args.imbalance_rate),
         file_name
     )
 

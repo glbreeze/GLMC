@@ -11,8 +11,8 @@
 
 # job info
 LOSS=$1
-BS=$2
-SEED=$3
+FEAT=$2
+BN=$3
 
 
 # Singularity path
@@ -25,6 +25,9 @@ singularity exec --nv \
 --overlay /scratch/lg154/sseg/dataset/tiny-imagenet-200.sqf:ro \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
-python main_nc.py --dataset cifar10 -a resnet18 --epochs 800 --scheduler ms --norm gn \
-  --loss ${LOSS} --eps 0.05 --batch_size ${BS} --seed 202${SEED} --store_name gn_${LOSS}_b${BS}_s${SEED}
-"
+python main.py --dataset cifar10 -a resnet32 --num_classes 10 --imbalance_rate 0.01 --beta 0.5 --lr 0.01  -b 64 \
+--weight_decay 5e-3 --resample_weighting 0.0 --label_weighting 1.2 --contrast_weight 4 --store_name baseline
+ " 
+
+
+ # --bias 
