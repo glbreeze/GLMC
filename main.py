@@ -13,12 +13,13 @@ from utils import util
 from utils.util import *
 from model import ResNet_cifar
 from model import Resnet_LT
+from model import ResNet_norm
 from imbalance_data import dataset_lt_data, cifar100Imbanlance, cifar10Imbanlance
 import logging
 import datetime
 import wandb
 from sklearn.metrics import confusion_matrix
-from Trainer import Trainer
+from Trainer_bn import Trainer_bn
 
 best_acc1 = 0
 
@@ -33,8 +34,8 @@ def get_model(args):
             net = ResNet_cifar.resnet50(num_class=args.num_classes)
         elif args.arch == 'resnet18':
             net = ResNet_cifar.resnet18(num_class=args.num_classes)
-        elif args.arch == 'resnet32':
-            net = ResNet_cifar.resnet32(num_class=args.num_classes)
+        elif args.arch == 'mresnet32':
+            net = ResNet_norm.mresnet32(args=args)
         elif args.arch == 'resnet34':
             net = ResNet_cifar.resnet34(num_class=args.num_classes)
         return net
@@ -77,7 +78,7 @@ def main(args):
         cudnn.benchmark = True
         
     os.environ["WANDB_API_KEY"] = "0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee"
-    os.environ["WANDB_MODE"] = "online" #"dryrun"
+    os.environ["WANDB_MODE"] = "online"  #"dryrun"
     os.environ["WANDB_CACHE_DIR"] = "/scratch/lg154/sseg/.cache/wandb"
     os.environ["WANDB_CONFIG_DIR"] = "/scratch/lg154/sseg/.config/wandb"
     wandb.login(key='0c0abb4e8b5ce4ee1b1a4ef799edece5f15386ee')
@@ -146,7 +147,7 @@ def main_worker(args):
     cls_num_list_cuda = torch.from_numpy(np.array(cls_num_list)).float().cuda()
     start_time = time.time()
     print("Training started!")
-    trainer = Trainer(args, model=model,train_loader=train_loader, val_loader=val_loader,weighted_train_loader=weighted_train_loader, per_class_num=train_cls_num_list,log=logging)
+    trainer = Trainer_bn(args, model=model,train_loader=train_loader, val_loader=val_loader,weighted_train_loader=weighted_train_loader, per_class_num=train_cls_num_list,log=logging)
     trainer.train()
     end_time = time.time()
     print("It took {} to execute the program".format(hms_string(end_time - start_time)))
@@ -157,6 +158,15 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('--branch2', default=False, action='store_true')                 # turn on
+    parser.add_argument('--contrast', default=False, action='store_true')                # turn on
+    parser.add_argument('--etf_cls', default=False, action='store_true')
+    parser.add_argument('--feat', type=str, default='null')
+    parser.add_argument('--norm', default=False, action='store_true')  # none|nn1|nn2
+    parser.add_argument('--bn_type', type=str, default='bn')  # cbn: class balanced bn
+    parser.add_argument('--bias', default=False, action='store_true')  # none|nn1|nn2    # turn on
+    parser.add_argument('--loss', type=str, default='ce')  # ce|ls|ceh|hinge
+
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbalance_type', default='exp', type=str, help='imbalance type')
     parser.add_argument('--imbalance_rate', default=0.01, type=float, help='imbalance factor')

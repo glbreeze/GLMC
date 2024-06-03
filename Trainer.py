@@ -428,7 +428,7 @@ class Trainer(object):
                 # Data augmentation
                 lam = np.random.beta(self.args.beta, self.args.beta)
 
-                mix_x, cut_x, mixup_y, mixcut_y, mixup_y_w, cutmix_y_w = util.GLMC_mixed(org1=input_org_1,
+                mix_x, cut_x, mixup_y, cutmix_y, mixup_y_w, cutmix_y_w = util.GLMC_mixed(org1=input_org_1,
                                                                                          org2=input_org_2,
                                                                                          invs1=input_invs_1,
                                                                                          invs2=input_invs_2,
@@ -437,14 +437,14 @@ class Trainer(object):
                                                                                          label_org_w=one_hot_org_w,
                                                                                          label_invs_w=one_hot_invs_w)
 
-                output_1, output_cb_1, z1, p1, _ = self.model(mix_x, ret='all')
-                output_2, output_cb_2, z2, p2, _ = self.model(cut_x, ret='all')
+                output_1, output_c1, z1, p1 = self.model(mix_x, mixup_y, ret='bc')
+                output_2, output_c2, z2, p2 = self.model(cut_x, cutmix_y, ret='bc')
                 contrastive_loss = self.SimSiamLoss(p1, z2) + self.SimSiamLoss(p2, z1)
 
-                loss_mix = -torch.mean(torch.sum(F.log_softmax(output_1, dim=1) * mixup_y, dim=1))
-                loss_cut = -torch.mean(torch.sum(F.log_softmax(output_2, dim=1) * mixcut_y, dim=1))
-                loss_mix_w = -torch.mean(torch.sum(F.log_softmax(output_cb_1, dim=1) * mixup_y_w, dim=1))
-                loss_cut_w = -torch.mean(torch.sum(F.log_softmax(output_cb_2, dim=1) * cutmix_y_w, dim=1))
+                loss_mix = -torch.mean(torch.sum(F.log_softmax(output_c1, dim=1) * mixup_y, dim=1))
+                loss_cut = -torch.mean(torch.sum(F.log_softmax(output_c2, dim=1) * cutmix_y, dim=1))
+                loss_mix_w = -torch.mean(torch.sum(F.log_softmax(output_1, dim=1) * mixup_y_w, dim=1))
+                loss_cut_w = -torch.mean(torch.sum(F.log_softmax(output_2, dim=1) * cutmix_y_w, dim=1))
 
                 balance_loss = loss_mix + loss_cut
                 rebalance_loss = loss_mix_w + loss_cut_w
@@ -467,12 +467,12 @@ class Trainer(object):
             wandb.log({'train/train_loss': losses.avg,
                        'lr': self.optimizer.param_groups[0]['lr']},
                       step=epoch)
-            # measure NC
+            #  ===== measure NC
             if self.args.debug > 0:
                 if (epoch + 1) % self.args.debug == 0:
                     nc_dict = analysis(self.model, self.train_loader, self.args)
-                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f},\nWnorm:{}\nHnorm:{}\nWcos:{}\nWHcos:{}'.format(
-                        nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'],
+                    self.log.info('Loss:{:.3f}, Acc:{:.2f}, NC1:{:.3f}, NC3:{:.3f}\nWnorm:{}\nHnorm:{}\nWcos:{}\nWHcos:{}'.format(
+                        nc_dict['loss'], nc_dict['acc'], nc_dict['nc1'], nc_dict['nc3'],
                         np.array2string(nc_dict['w_norm'], separator=',',
                                         formatter={'float_kind': lambda x: "%.3f" % x}),
                         np.array2string(nc_dict['h_norm'], separator=',',
@@ -499,7 +499,6 @@ class Trainer(object):
                 #     self.log.info('-- Has saved the NC analysis result to {}'.format(filename))
 
             # ============ evaluation ============
-
             if self.args.imbalance_rate < 1.0:
                 cfeats = self.get_knncentroids()
                 self.knn_classifier = KNNClassifier(feat_dim=self.model.out_dim, num_classes=self.args.num_classes, feat_type='cl2n', dist_type='l2')
@@ -579,6 +578,3 @@ class Trainer(object):
                 return all_targets, all_feats, all_logits, all_ncc_logits
             else:
                 return all_targets, all_feats, all_logits, []
-
-
-
