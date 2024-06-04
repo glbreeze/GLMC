@@ -115,9 +115,17 @@ class Trainer_bn(object):
             
             freq = torch.bincount(targets, minlength=self.args.num_classes)
             cls_idx = torch.where(freq==0)[0]
-            if len(cls_idx) > 0 and self.args.bn_type == 'cbn': 
-                bn_inputs = torch.cat([self.queue[k] for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
-                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
+            if len(cls_idx) > 0 and self.args.bn_type == 'cbn':
+                if True:
+                    try:
+                        bn_inputs, bn_targets = next(weighted_train_loader)
+                    except:
+                        weighted_train_loader = iter(self.weighted_train_loader)
+                        bn_inputs, bn_targets = next(weighted_train_loader)
+                    bn_inputs, bn_targets = bn_inputs.to(self.device), bn_targets.to(self.device)
+                else:
+                    bn_inputs = torch.cat([self.queue[k] for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
+                    bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
 
                 all_inputs = torch.cat([inputs, bn_inputs])
                 all_targets = torch.cat([targets, bn_targets])
@@ -128,7 +136,7 @@ class Trainer_bn(object):
             output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
 
             # update the img_bank with current batch
-            if self.args.bn_type == 'cbn': 
+            if self.args.bn_type == 'cbn' and False:
                 for k in self.queue:
                     cls_idx = torch.where(targets == k)[0]
                     if len(cls_idx) == 0:
@@ -145,7 +153,6 @@ class Trainer_bn(object):
                             self.queue[k][:num_cls-(len(self.queue[k])-ptr)] = inputs[cls_idx][:num_cls-(len(self.queue[k])-ptr)]
                         self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
                     
-
             # ==== update loss and acc
             train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)

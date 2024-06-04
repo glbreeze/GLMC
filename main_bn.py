@@ -97,10 +97,7 @@ def main_worker(args):
 
     # ================= Data loading code =================
     train_dataset, val_dataset = get_dataset(args)
-    # train_dataset_minority = copy(train_dataset)
-    # change train_dataset_minority.data to keep the minory class only
     num_classes = len(np.unique(train_dataset.targets))
-    img_bank = {k: None for k in range(num_classes)}
     assert num_classes == args.num_classes
 
     # ================= Default Loader
@@ -117,8 +114,7 @@ def main_worker(args):
         cls_num_list[label] += 1
     cls_num_list = np.array(cls_num_list)
 
-    cls_weight = 1.0 / (cls_num_list ** args.resample_weighting)
-    cls_weight = cls_weight / np.sum(cls_weight) * len(cls_num_list)
+    cls_weight = (np.max(cls_num_list) - cls_num_list)/cls_num_list
     samples_weight = np.array([cls_weight[t] for t in train_dataset.targets])
     samples_weight = torch.from_numpy(samples_weight)
     samples_weight = samples_weight.double()
