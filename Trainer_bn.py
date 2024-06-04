@@ -50,11 +50,12 @@ class Trainer_bn(object):
         self.weighted_train_loader = weighted_train_loader
 
         # init queue
-        samples_per_class = get_samples_per_class(train_loader.dataset,
-                                                  num_samples_per_class=np.ceil(args.batch_size/args.num_classes),
-                                                  num_classes=args.num_classes)
-        self.queue = {k: torch.cat(samples_per_class[k], dim=0).to(self.device) for k in range(args.num_classes)}
-        self.queue_ptr = {k: torch.zeros(1, dtype=torch.long) for k in range(args.num_classes)}
+        if args.bn_type == 'cbn':
+            samples_per_class = get_samples_per_class(train_loader.dataset,
+                                                    num_samples_per_class=np.ceil(args.batch_size/args.num_classes),
+                                                    num_classes=args.num_classes)
+            self.queue = {k: torch.cat(samples_per_class[k], dim=0).to(self.device) for k in range(args.num_classes)}
+            self.queue_ptr = {k: torch.zeros(1, dtype=torch.long) for k in range(args.num_classes)}
 
         self.per_cls_weights = None
         self.cls_num_list = per_class_num
@@ -108,40 +109,41 @@ class Trainer_bn(object):
                 cutmix = v2.CutMix(num_classes=self.args.num_classes)
                 inputs, reweighted_targets = cutmix(inputs, targets)   # reweighted target will be [B, K]
 
-            if self.args.mixup >= 0:
-                output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
-                                                                         mixup_alpha=self.args.mixup_alpha)
-            else:
-                freq = torch.bincount(targets, minlength=self.args.num_classes)
-                cls_idx = torch.where(freq==0)[0]
-                if len(cls_idx) > 0: 
-                    bn_inputs = torch.cat([self.queue[k] for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
-                    bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
+            # if self.args.mixup >= 0:
+            #     output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup,
+            #                                                              mixup_alpha=self.args.mixup_alpha)
+            
+            freq = torch.bincount(targets, minlength=self.args.num_classes)
+            cls_idx = torch.where(freq==0)[0]
+            if len(cls_idx) > 0 and self.args.bn_type == 'cbn': 
+                bn_inputs = torch.cat([self.queue[k] for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
+                bn_targets = torch.cat([torch.tensor(k).repeat(len(self.queue[0])) for k in cls_idx.cpu().numpy()], dim=0).to(self.device)
 
-                    all_inputs = torch.cat([inputs, bn_inputs])
-                    all_targets = torch.cat([targets, bn_targets])
-                else: 
-                    all_inputs, all_targets = inputs, targets
+                all_inputs = torch.cat([inputs, bn_inputs])
+                all_targets = torch.cat([targets, bn_targets])
+            else: 
+                all_inputs, all_targets = inputs, targets
 
-                output_all, h_all = self.model(all_inputs, all_targets, ret='of')
-                output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
+            output_all, h_all = self.model(all_inputs, all_targets, ret='of')
+            output, h = output_all[0:len(inputs)], h_all[0:len(inputs)]
 
             # update the img_bank with current batch
-            for k in self.queue:
-                cls_idx = torch.where(targets == k)[0]
-                if len(cls_idx) == 0:
-                    pass
-                else:
-                    ptr = self.queue_ptr[k]
-                    num_cls = min(len(self.queue[k]), len(cls_idx))                  
+            if self.args.bn_type == 'cbn': 
+                for k in self.queue:
+                    cls_idx = torch.where(targets == k)[0]
+                    if len(cls_idx) == 0:
+                        pass
+                    else:
+                        ptr = self.queue_ptr[k]
+                        num_cls = min(len(self.queue[k]), len(cls_idx))                  
 
-                    # replace the keys at ptr (dequeue and enqueue)
-                    if ptr + num_cls <= len(self.queue[k]):
-                        self.queue[k][ptr:ptr + num_cls] = inputs[cls_idx][:num_cls]
-                    else: 
-                        self.queue[k][ptr:] = inputs[cls_idx][num_cls-(len(self.queue[k])-ptr):num_cls]
-                        self.queue[k][:num_cls-(len(self.queue[k])-ptr)] = inputs[cls_idx][:num_cls-(len(self.queue[k])-ptr)]
-                    self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
+                        # replace the keys at ptr (dequeue and enqueue)
+                        if ptr + num_cls <= len(self.queue[k]):
+                            self.queue[k][ptr:ptr + num_cls] = inputs[cls_idx][:num_cls]
+                        else: 
+                            self.queue[k][ptr:] = inputs[cls_idx][num_cls-(len(self.queue[k])-ptr):num_cls]
+                            self.queue[k][:num_cls-(len(self.queue[k])-ptr)] = inputs[cls_idx][:num_cls-(len(self.queue[k])-ptr)]
+                        self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
                     
 
             # ==== update loss and acc
@@ -395,6 +397,9 @@ class Trainer_bn(object):
         # Calculate initial centroids only on training data.
         with torch.set_grad_enabled(False):
             for i, (inputs, labels) in enumerate(self.train_loader):
+                if isinstance(inputs, list): 
+                    inputs = torch.cat(inputs, dim=0)
+                    labels = torch.cat((labels, labels), dim=0)
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 # Calculate Features of each training data
@@ -476,7 +481,7 @@ class Trainer_bn(object):
                 one_hot_invs_w = one_hot_invs_w.cuda()
 
                 # Data augmentation
-                lam = np.random.beta(self.beta, self.beta)
+                lam = np.random.beta(self.args.beta, self.args.beta)
 
                 mix_x, cut_x, mixup_y, cutmix_y, mixup_y_w, cutmix_y_w = util.GLMC_mixed(org1=input_org_1,
                                                                                          org2=input_org_2,
@@ -487,8 +492,8 @@ class Trainer_bn(object):
                                                                                          label_org_w=one_hot_org_w,
                                                                                          label_invs_w=one_hot_invs_w)
 
-                output_1, output_c1, z1, p1 = self.model(mix_x, ret='bc')
-                output_2, output_c2, z2, p2 = self.model(cut_x, ret='bc')
+                output_1, output_c1, z1, p1 = self.model(mix_x, mixup_y, ret='bc')
+                output_2, output_c2, z2, p2 = self.model(cut_x, cutmix_y, ret='bc')
                 contrastive_loss = self.SimSiamLoss(p1, z2) + self.SimSiamLoss(p2, z1)
 
                 loss_mix = -torch.mean(torch.sum(F.log_softmax(output_c1, dim=1) * mixup_y, dim=1))
@@ -542,6 +547,38 @@ class Trainer_bn(object):
                                'nc/nc3d': nc_dict['nc3_d'],
                                },
                               step=epoch + 1)
+                    
+                    if self.args.imbalance_type == 'step' and self.args.imbalance_rate < 1.0:
+                        wandb.log({'nc1/w_mnorm': nc_dict['w_mnorm'],
+                                   'nc1/w_mnorm1': nc_dict['w_mnorm1'],
+                                   'nc1/w_mnorm2': nc_dict['w_mnorm2'],
+                                   'nc1/h_mnorm': nc_dict['h_mnorm'],
+                                   'nc1/h_mnorm1': nc_dict['h_mnorm1'],
+                                   'nc1/h_mnorm2': nc_dict['h_mnorm2'],
+                                   'nc1/w_cos1': nc_dict['w_cos1'],
+                                   'nc1/w_cos2': nc_dict['w_cos2'],
+                                   'nc1/w_cos3': nc_dict['w_cos3'],
+                                   'nc1/h_cos1': nc_dict['h_cos1'],
+                                   'nc1/h_cos2': nc_dict['h_cos2'],
+                                   'nc1/h_cos3': nc_dict['h_cos3']},
+                                  step=epoch + 1)
+                        
+                    val_nc_dict = analysis_feat(self.model, val_targets, val_feats, val_logits, self.args)
+                    wandb.log({'nc_val/loss': nc_dict['loss'],
+                               'nc_val/acc': nc_dict['acc'],
+                               'nc_val/nc1': nc_dict['nc1'],
+                               'nc_val/nc2h': nc_dict['nc2_h'],
+                               'nc_val/nc2w': nc_dict['nc2_w'],
+                               'nc_val/nc3': nc_dict['nc3'],
+                               'nc_val/nc3d': nc_dict['nc3_d'],
+                               },
+                              step=epoch + 1)
+
+                    if (epoch + 1) % (self.args.debug * 5) == 0:
+                        fig = plot_nc(nc_dict)
+                        wandb.log({"chart": fig}, step=epoch + 1)
+                        fig_val = plot_nc(val_nc_dict)
+                        wandb.log({"chart_val": fig_val}, step=epoch + 1)
 
             # ============ evaluation ============
             if self.args.imbalance_rate < 1.0:

@@ -26,7 +26,7 @@ singularity exec --nv \
 ${sif_path} /bin/bash -c "
 source /ext3/env.sh
 python main.py --dataset cifar10 -a mresnet32 --imbalance_rate 0.01 --beta 0.5 --lr 0.01 -b 64 --branch2 --contrast --bias \
---weight_decay 5e-3 --resample_weighting 0.0 --label_weighting 1.2 --contrast_weight 4 --store_name baseline
+--weight_decay 5e-3 --resample_weighting 0.0 --label_weighting 1.2 --contrast_weight 4 --store_name baseline1
  " 
 
 

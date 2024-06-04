@@ -157,7 +157,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Global and Local Mixture Consistency Cumulative Learning")
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet34',choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'mresnet32', 'resnext50_32x4d'))
     parser.add_argument('--branch2', default=False, action='store_true')                 # turn on
     parser.add_argument('--contrast', default=False, action='store_true')                # turn on
     parser.add_argument('--etf_cls', default=False, action='store_true')

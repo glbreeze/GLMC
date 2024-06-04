@@ -142,6 +142,9 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='cifar100', help="cifar10,cifar100,ImageNet-LT,iNaturelist2018")
     parser.add_argument('--root', type=str, default='../dataset/', help="dataset setting")
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32') # , choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('--branch2', default=False, action='store_true')                 # turn on
+    parser.add_argument('--contrast', default=False, action='store_true')  
+    
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--imbalance_rate', default=1.0, type=float, help='imbalance factor')
     parser.add_argument('--imbalance_type', default='null', type=str, help='imbalance type')
