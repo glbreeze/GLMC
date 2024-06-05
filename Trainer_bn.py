@@ -152,7 +152,7 @@ class Trainer_bn(object):
                             self.queue[k][ptr:] = inputs[cls_idx][num_cls-(len(self.queue[k])-ptr):num_cls]
                             self.queue[k][:num_cls-(len(self.queue[k])-ptr)] = inputs[cls_idx][:num_cls-(len(self.queue[k])-ptr)]
                         self.queue_ptr[k] = (ptr + num_cls) % len(self.queue[k])  # move pointer
-                    
+
             # ==== update loss and acc
             train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
