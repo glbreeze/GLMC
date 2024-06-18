@@ -9,14 +9,20 @@ from .utils import *
 
 class LinearLayer(nn.Module):
 
-    def __init__(self, in_features, out_features,):
+    def __init__(self, in_features, out_features, bias=False):
         super(LinearLayer, self).__init__()
+        self.bias = bias
         self.weight = nn.Parameter(torch.FloatTensor(out_features, in_features))
+        if self.bias:
+            self.mu = nn.Parameter(torch.FloatTensor(in_features))
         nn.init.xavier_uniform_(self.weight)
 
     def forward(self, input):
         # --------------------------- cos(theta) & phi(theta) ---------------------------
-        logits = F.linear(F.normalize(input), F.normalize(self.weight))   # [B, 10]
+        if self.bias:
+            logits = F.linear(F.normalize(input) - self.mu, F.normalize(self.weight))  # [B, 10]
+        else:
+            logits = F.linear(F.normalize(input), F.normalize(self.weight))   # [B, 10]
         return logits.clamp(-1, 1)
 
 
@@ -281,7 +287,7 @@ class ResNet_modify(nn.Module):
                                         )
 
         if args.loss.endswith('m'):  # m for margin loss, linear layer which normalize both feature and weight w
-            self.fc = LinearLayer(self.out_dim, self.num_classes)
+            self.fc = LinearLayer(self.out_dim, self.num_classes, bias=self.args.bias.lower() == 't')
         else:
             if self.args.bias in ['f', 't']:
                 self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias.lower()=='t')  # may need to change the bias
