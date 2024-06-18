@@ -20,6 +20,21 @@ class LinearLayer(nn.Module):
         return logits.clamp(-1, 1)
 
 
+class BLinearLayer(nn.Module):
+    """custom linear layer with constant bias"""
+    def __init__(self, in_features, out_features,):
+        super(BLinearLayer, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.bias_param = nn.Parameter(torch.Tensor(1))
+        nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, input):
+        bias = self.bias_param.expand(self.out_features)  # Create bias vector from single parameter
+        return torch.nn.functional.linear(input, self.weight, bias)
+
+
 def _weights_init(m):
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         init.kaiming_normal_(m.weight)
@@ -247,6 +262,11 @@ class ResNet_modify(nn.Module):
             self.feature = BNSequential(nn.AdaptiveAvgPool2d((1, 1)),
                                         nn.Flatten()
                                         )
+        elif self.args.feat == 'b':
+            self.feature = BNSequential(norm_layer(self.out_dim, affine=False),
+                                        nn.AdaptiveAvgPool2d((1, 1)),
+                                        nn.Flatten()
+                                        )
         elif self.args.feat == 'fb':                                              # still need to fix norm layer
             self.feature = BNSequential(nn.Flatten(),
                                         nn.Linear(self.out_dim * 4 * 4, self.out_dim),
@@ -263,8 +283,11 @@ class ResNet_modify(nn.Module):
         if args.loss.endswith('m'):  # m for margin loss, linear layer which normalize both feature and weight w
             self.fc = LinearLayer(self.out_dim, self.num_classes)
         else:
-            self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias)  # may need to change the bias
-            self.apply(_weights_init)
+            if self.args.bias in ['f', 't']:
+                self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias.lower()=='t')  # may need to change the bias
+                self.apply(_weights_init)
+            elif self.args.bias == 'c':
+                self.fc = BLinearLayer(self.out_dim, self.num_classes)
 
         if args.branch2:
             self.fc_c = nn.Linear(self.out_dim, self.num_classes, bias=True)
