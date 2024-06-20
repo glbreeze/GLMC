@@ -91,7 +91,7 @@ class Trainer_bn(object):
         elif self.args.loss == 'arcf' or self.args.loss == 'arcm':
             self.criterion = CombinedMarginLoss(64, self.args.margins[0], self.args.margins[1], self.args.margins[2])
 
-    def train_one_epoch(self):
+    def train_one_epoch(self, epoch):
 
         # switch to train mode
         self.model.train()
@@ -105,6 +105,11 @@ class Trainer_bn(object):
 
         for i, (inputs, targets) in enumerate(train_loader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
+            
+            if self.args.loss == 'arcm' and self.args.bias == 'g' and epoch<=1 and i<=1 and self.args.dataset=='cifar10':
+                with torch.no_grad(): 
+                    _, feat = self.model(inputs, targets, ret='of')
+                    self.model.fc.mu.data = torch.mean(feat, dim=0)
 
             if self.args.aug == 'cm' or self.args.aug == 'cutmix':  # cutmix augmentation within the mini-batch
                 cutmix = v2.CutMix(num_classes=self.args.num_classes)
@@ -204,7 +209,7 @@ class Trainer_bn(object):
 
             # ============ training ============
             start_time = time.time()
-            losses, train_acc = self.train_one_epoch()
+            losses, train_acc = self.train_one_epoch(epoch=epoch)
             epoch_time = time.time() - start_time
             self.log.info(
                 '====>EPOCH{epoch}Train{iters}, Epoch Time:{epoch_time:.3f}, Loss:{loss:.4f}, Acc:{acc:.4f}'.format(
@@ -215,7 +220,7 @@ class Trainer_bn(object):
                        'train/train_acc': train_acc.avg,
                        'lr': self.optimizer.param_groups[0]['lr']},
                       step=epoch + 1)
-            if epoch % 10 == 0 and (self.args.bias in ['t', 'true']):
+            if epoch % 10 == 0 and (self.args.bias in ['t', 'true'] and self.args.loss=='ce'):
                 bias_values = self.model.fc.bias.data
                 self.log.info('--Epoch_{epoch}, Bias: {bias_str}'.format(
                     epoch=epoch + 1, bias_str=', '.join([f'{bias_value:.4f}' for bias_value in bias_values])))

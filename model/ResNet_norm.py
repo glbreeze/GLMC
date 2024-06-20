@@ -9,18 +9,20 @@ from .utils import *
 
 class LinearLayer(nn.Module):
 
-    def __init__(self, in_features, out_features, bias=False):
+    def __init__(self, in_features, out_features, bias='f'):
         super(LinearLayer, self).__init__()
         self.bias = bias
         self.weight = nn.Parameter(torch.FloatTensor(out_features, in_features))
-        if self.bias:
+        if self.bias.lower() in ['t', 'g']:
             self.mu = nn.Parameter(torch.FloatTensor(in_features))
         nn.init.xavier_uniform_(self.weight)
 
     def forward(self, input):
         # --------------------------- cos(theta) & phi(theta) ---------------------------
-        if self.bias:
+        if self.bias.lower() == 't':
             logits = F.linear(F.normalize(input) - self.mu, F.normalize(self.weight))  # [B, 10]
+        elif self.bias.lower() == 'g': 
+            logits = F.linear(F.normalize(input-self.mu), F.normalize(self.weight))  # [B, 10]
         else:
             logits = F.linear(F.normalize(input), F.normalize(self.weight))   # [B, 10]
         return logits.clamp(-1, 1)
@@ -287,11 +289,13 @@ class ResNet_modify(nn.Module):
                                         )
 
         if args.loss.endswith('m'):  # m for margin loss, linear layer which normalize both feature and weight w
-            self.fc = LinearLayer(self.out_dim, self.num_classes, bias=self.args.bias.lower() == 't')
+            self.fc = LinearLayer(self.out_dim, self.num_classes, bias=self.args.bias)
         else:
-            if self.args.bias in ['f', 't']:
+            if self.args.bias in ['f', 't', 'g']:
                 self.fc = nn.Linear(self.out_dim, self.num_classes, bias=self.args.bias.lower()=='t')  # may need to change the bias
                 self.apply(_weights_init)
+                if self.args.bias == 'g': 
+                    self.mu = nn.Parameter(torch.FloatTensor(self.out_dim))
             elif self.args.bias == 'c':
                 self.fc = BLinearLayer(self.out_dim, self.num_classes)
 
@@ -326,6 +330,8 @@ class ResNet_modify(nn.Module):
         out = self.layer3(out, label)
 
         feat = self.feature(out, label)
+        if self.args.bias == 'g' and self.args.loss=='ce':
+            feat = feat - self.mu
         if self.args.norm:
             feat = F.normalize(feat, p=2, dim=-1)
         out = self.fc(feat)
