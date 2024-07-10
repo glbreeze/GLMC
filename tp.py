@@ -24,3 +24,15 @@ matrix = np.array([[1.000999, 2], [3, 4]])
 # Flatten the matrix and print the values in one row
 flattened_matrix = matrix.flatten()
 print(' '.join(map(str, flattened_matrix)))
+
+K = 10
+S = 5
+Z = torch.concatenate((
+    torch.tensor([1.0]),
+    torch.tensor([-1/(K-1)] * (K-1))
+)).view(1, -1)
+
+torch.softmax(Z*S, dim=1)
+
+import numpy as np
+np.exp(1*S) / (np.exp(1*S) + (K-1)*np.exp(-1/(K-1) * S))

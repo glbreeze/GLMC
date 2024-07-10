@@ -1,6 +1,7 @@
 import os
 import math
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -145,6 +146,10 @@ class CombinedMarginLoss(torch.nn.Module):
 
         if self.eps > 0:
             criterion = CrossEntropyLabelSmooth(logits.shape[-1], epsilon=self.eps)
+        elif self.eps == -1:
+            K = logits.shape[-1]
+            eps = np.exp(-1 / (K - 1) * self.s) / (np.exp(1 * self.s) + (K - 1) * np.exp(-1 / (K - 1) * self.s)) * K
+            criterion = CrossEntropyLabelSmooth(logits.shape[-1], epsilon=eps)
         else:
             criterion = torch.nn.CrossEntropyLoss()
         # logits still need to go through SoftMax for cross entropy loss
