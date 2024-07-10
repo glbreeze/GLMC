@@ -92,8 +92,10 @@ class CombinedMarginLoss(torch.nn.Module):
                  m1,
                  m2,
                  m3,
-                 interclass_filtering_threshold=0):
+                 interclass_filtering_threshold=0,
+                 eps = 0):
         super().__init__()
+        self.eps = eps
         self.s = s
         self.m1 = m1  # 1
         self.m2 = m2  # 0.5
@@ -122,7 +124,7 @@ class CombinedMarginLoss(torch.nn.Module):
 
         target_logit = logits[index_positive, labels[index_positive].view(-1)]
 
-        if self.m1 == 1.0 and self.m3 == 0.0:
+        if self.m1 == 1.0 and self.m3 == 0.0 and self.m2 > 0:
             with torch.no_grad():
                 target_logit.arccos_()  # angle for target class  \theta_y
                 logits.arccos_()        # angle for all classes   \theta_j
@@ -131,6 +133,9 @@ class CombinedMarginLoss(torch.nn.Module):
                 logits.cos_()
             logits = logits * self.s  # s*cos(\theta_j)  (j=y: target class different)
 
+        elif self.m1 == 1.0 and self.m3 == 0.0 and self.m2 == 0.0:
+            logits = logits * self.s
+
         elif self.m3 > 0:
             final_target_logit = target_logit - self.m3
             logits[index_positive, labels[index_positive].view(-1)] = final_target_logit
@@ -138,6 +143,9 @@ class CombinedMarginLoss(torch.nn.Module):
         else:
             raise
 
-        criterion = torch.nn.CrossEntropyLoss()
+        if self.eps > 0:
+            criterion = CrossEntropyLabelSmooth(logits.shape[-1], epsilon=self.eps)
+        else:
+            criterion = torch.nn.CrossEntropyLoss()
         # logits still need to go through SoftMax for cross entropy loss
         return criterion(logits, labels)

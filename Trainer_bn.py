@@ -68,7 +68,7 @@ class Trainer_bn(object):
         if self.args.scheduler == 'cos':
             self.train_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epochs)
         elif self.args.scheduler == 'ms':
-            self.train_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[70, 140], gamma=0.1),
+            self.train_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[70, 140], gamma=0.1)
         self.update_weight()
         self.set_loss()
 
@@ -92,7 +92,7 @@ class Trainer_bn(object):
         elif self.args.loss == 'bce':
             self.criterion = nn.BCELoss(reduction='mean')
         elif self.args.loss == 'arcf' or self.args.loss == 'arcm':
-            self.criterion = CombinedMarginLoss(64, self.args.margins[0], self.args.margins[1], self.args.margins[2])
+            self.criterion = CombinedMarginLoss(s=self.args.s, m1=self.args.margins[0], m2=self.args.margins[1], m3=self.args.margins[2], eps=self.args.eps)
 
     def train_one_epoch(self, epoch):
 
