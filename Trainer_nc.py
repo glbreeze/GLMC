@@ -78,7 +78,7 @@ class Trainer(object):
                 inputs, reweighted_targets = cutmix(inputs)  # reweighted target will be [B, K]
                 
             if self.args.mixup >= 0:
-                output, reweighted_targets, h = self.model.forward_mixup(inputs, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
+                output, reweighted_targets, h = self.model.forward_mixup(inputs, targets, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
             else:
                 output, h = self.model(inputs, ret='of')
 
