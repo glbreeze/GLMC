@@ -8,7 +8,7 @@ import datetime
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from tensorboardX import SummaryWriter
+from torchvision.transforms import v2
 from sklearn.metrics import confusion_matrix
 
 from utils import util
@@ -73,14 +73,22 @@ class Trainer(object):
 
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            output, h = self.model(inputs, ret='of')
+            if self.args.aug == 'cm' or self.args.aug == 'cutmix':  # cutmix augmentation within the mini-batch
+                cutmix = v2.CutMix(num_classes=self.args.num_classes)
+                inputs, reweighted_targets = cutmix(inputs)  # reweighted target will be [B, K]
+                
+            if self.args.mixup >= 0:
+                output, reweighted_targets, h = self.model.forward_mixup(inputs, mixup=self.args.mixup, mixup_alpha=self.args.mixup_alpha)
+            else:
+                output, h = self.model(inputs, ret='of')
 
             # ==== update loss and acc
+            loss = self.criterion(output,
+                                  reweighted_targets if self.args.mixup >= 0 or self.args.aug in ['cm', 'cutmix'] else targets)
+            losses.update(loss.item(), targets.size(0))
             train_acc.update(torch.sum(output.argmax(dim=-1) == targets).item() / targets.size(0),
                              targets.size(0)
                              )
-            loss = self.criterion(output, targets)
-            losses.update(loss.item(), targets.size(0))
 
             # ==== gradient update
             self.optimizer.zero_grad()
@@ -114,14 +122,11 @@ class Trainer(object):
                 '====>EPOCH_{epoch}_Iters_{iters}, Epoch Time:{epoch_time:.3f}, Loss:{loss:.4f}, Acc:{acc:.4f}'.format(
                     epoch=epoch, iters=len(self.train_loader), epoch_time=epoch_time, loss=losses.avg, acc=train_acc.avg
                 ))
-            if epoch % 10 == 0 and self.args.bias:
-                bias_values = self.model.fc.bias.data
-                self.log.info('--Epoch_{epoch}, Bias: {bias_str}'.format(
-                    epoch=epoch, bias_str=', '.join([f'{bias_value:.4f}' for bias_value in bias_values])))
+        
             wandb.log({'train/train_loss': losses.avg,
                        'train/train_acc': train_acc.avg,
                        'lr': self.optimizer.param_groups[0]['lr']},
-                      step=epoch + 1)
+                      step=epoch)
 
             # ===== evaluate on validation set
             acc1, acc5, cls_acc, many_acc, few_acc = self.validate(epoch=epoch)
@@ -129,7 +134,7 @@ class Trainer(object):
                        'val/val_acc5': acc5,
                        'val/many_acc': many_acc,
                        'val/few_acc': few_acc},
-                      step=epoch + 1)
+                      step=epoch)
 
             # ===== measure NC
             if self.args.debug > 0:

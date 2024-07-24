@@ -49,7 +49,10 @@ def analysis(model, loader, args):
                 data = torch.cat(data, dim=0)
                 target = torch.cat((target, target), dim=0)
             data, target = data.to(device), target.to(device)
-            logits, feats = model(data, target, ret='of')
+            if args.arch.startswith('mres'):
+                logits, feats = model(data, target, ret='of')
+            else:
+                logits, feats = model(data, ret='of')
             logits_list.append(logits)
             labels_list.append(target)
             feats_list.append(feats)

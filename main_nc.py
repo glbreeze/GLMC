@@ -86,7 +86,7 @@ def main_worker(gpu, args):
 
     start_time = time.time()
     print("Training started!")
-    trainer = Trainer(args, model=model, train_loader=train_loader, val_loader=val_loader, train_dataset_base=train_dataset_base, log=logging)
+    trainer = Trainer(args, model=model, train_loader=train_loader, val_loader=val_loader, train_loader_base=train_loader_base, log=logging)
     trainer.train_base()
     end_time = time.time()
     print("It took {} to execute the program".format(hms_string(end_time - start_time)))
