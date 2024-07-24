@@ -57,7 +57,7 @@ def analysis(model, loader, args):
         labels = torch.cat(labels_list).to(device)
         feats = torch.cat(feats_list).to(device)
     if args.loss in ['arcf', 'arcm'] and args.bias == 'g':
-        feats = F.normalize(feats-model.fc.mu)
+        feats = F.normalize(feats-model.fc.mu.detach())
 
     loss = torch.nn.CrossEntropyLoss(reduction='mean')(logits, labels).item()
     acc = (logits.argmax(dim=-1) == labels).sum().item()/len(labels)
