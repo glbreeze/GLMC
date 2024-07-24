@@ -14,8 +14,8 @@ class GroupNorm32(torch.nn.GroupNorm):
 class ResNet(nn.Module):
     def __init__(self, pretrained=False, num_classes=10, small_kernel=True, backbone='resnet18', args=None):
         super(ResNet, self).__init__()
+        self.num_classes = num_classes
 
-        # Load the pretrained ResNet model
         if args.norm == 'bn':
             resnet_model = models.__dict__[backbone](pretrained=pretrained)
         else:
