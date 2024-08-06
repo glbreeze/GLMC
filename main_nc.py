@@ -113,7 +113,8 @@ if __name__ == '__main__':
     parser.add_argument('--imbalance_type', type=str, default='null')  # null | step | exp
 
     # model structure
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet32', choices=('resnet18', 'mresnet32', 'resnet34', 'resnet32', 'resnet50', 'resnext50_32x4d'))
+    parser.add_argument('--feat', type=str, default='null')
     parser.add_argument('--num_classes', default=100, type=int, help='number of classes ')
     parser.add_argument('--norm', type=str, default='bn', help='Type of norm layer')  # bn|gn
 
